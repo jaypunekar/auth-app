@@ -1,0 +1,310 @@
+.chat-container {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 30px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.messages {
+  height: 500px;
+  overflow-y: auto;
+  padding: 20px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(4px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+  scroll-behavior: smooth;
+}
+
+.message {
+  margin-bottom: 15px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  max-width: 80%;
+  backdrop-filter: blur(4px);
+}
+
+.message.user {
+  background: linear-gradient(135deg, #6e8efb, #4a6cf7);
+  color: white;
+  margin-left: 20%;
+  align-self: flex-end;
+  box-shadow: 0 4px 12px rgba(74, 108, 247, 0.2);
+}
+
+.message.assistant {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(31, 38, 135, 0.1);
+  color: #2f2b3d;
+}
+
+.input-container {
+  display: flex;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  font-size: 1rem;
+  color: #2f2b3d;
+  transition: all 0.3s ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: #4a6cf7;
+  box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.2);
+}
+
+button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6e8efb, #4a6cf7);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(74, 108, 247, 0.2);
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(74, 108, 247, 0.3);
+}
+
+button:disabled {
+  background: linear-gradient(135deg, #a5b6fc, #8ca2f9);
+  transform: none;
+  cursor: not-allowed;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  font-size: 1.2rem;
+  color: #4a6cf7;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.15);
+  backdrop-filter: blur(4px);
+  margin: 20px auto;
+  max-width: 300px;
+}
+
+.message.error {
+  background: rgba(254, 226, 226, 0.9);
+  color: #dc2626;
+  border: 1px solid rgba(254, 202, 202, 0.5);
+}
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  justify-content: center;
+  width: 40px;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #6e8efb, #4a6cf7);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+  opacity: 0.7;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+  }
+  40% { 
+    transform: scale(1.0);
+  }
+}
+
+.input-container input:disabled,
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+button.sending {
+  background-color: #b4b0c5;
+}
+
+.message.typing {
+  background-color: #f4f3f8;
+  width: fit-content;
+  min-width: 60px;
+}
+
+.message.description {
+  background: rgba(255, 255, 255, 0.95);
+  margin: 0 auto 20px auto;
+  max-width: 90%;
+  white-space: pre-line;
+  line-height: 1.6;
+  border-left: 4px solid #4a6cf7;
+  font-size: 1.1rem;
+  color: #2f2b3d;
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.1);
+}
+
+.message.description ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.message.description li {
+  margin: 5px 0;
+}
+
+/* Add these styles for markdown content */
+.message-text {
+  line-height: 1.6;
+}
+
+.message-text h1 {
+  font-size: 1.6rem;
+  margin-bottom: 1rem;
+  color: #4a6cf7;
+  font-weight: 600;
+}
+
+.message-text h2 {
+  font-size: 1.3rem;
+  margin-bottom: 0.75rem;
+  color: #4a6cf7;
+  font-weight: 500;
+}
+
+.message-text h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  color: #4a6cf7;
+  font-weight: 500;
+}
+
+.message-text ul, 
+.message-text ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.message-text li {
+  margin: 0.25rem 0;
+}
+
+.message-text p {
+  margin: 0.5rem 0;
+}
+
+.message-text code {
+  background: rgba(74, 108, 247, 0.1);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #4a6cf7;
+}
+
+.message-text pre {
+  background: rgba(74, 108, 247, 0.05);
+  padding: 1rem;
+  border-radius: 12px;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  border: 1px solid rgba(74, 108, 247, 0.1);
+}
+
+.message-text a {
+  color: #4a6cf7;
+  text-decoration: none;
+  border-bottom: 1px solid #4a6cf7;
+  transition: all 0.3s ease;
+}
+
+.message-text a:hover {
+  opacity: 0.8;
+}
+
+.message-text blockquote {
+  border-left: 4px solid #4a6cf7;
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  color: #4a6cf7;
+  background: rgba(74, 108, 247, 0.05);
+}
+
+.message-text table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.message-text th,
+.message-text td {
+  border: 1px solid rgba(74, 108, 247, 0.2);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.message-text th {
+  background: rgba(74, 108, 247, 0.1);
+  color: #4a6cf7;
+  font-weight: 500;
+}
+
+/* Update existing message styles */
+.message.description .message-text {
+  color: #0f172a;
+}
+
+/* Add smooth scrolling to the messages container */
+.messages::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.messages::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #6e8efb, #4a6cf7);
+  border-radius: 4px;
+}
+
+.messages::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #5a7dfb, #3959f7);
+} 
