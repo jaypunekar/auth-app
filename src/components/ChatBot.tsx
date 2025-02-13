@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ChatBot.css';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 interface Message {
   text: string;
   isUser: boolean;
@@ -19,7 +21,7 @@ const ChatBot: React.FC = () => {
 
   const initializeChat = async () => {
     try {
-      const response = await axios.post('http://localhost:8000/api/init-chat');
+      const response = await axios.post(`${API_URL}/api/init-chat`);
       setThreadId(response.data.thread_id);
       if (response.data.message) {
         setMessages([{ text: response.data.message, isUser: false }]);
@@ -37,7 +39,7 @@ const ChatBot: React.FC = () => {
     setMessages(prev => [...prev, { text: userMessage, isUser: true }]);
 
     try {
-      const response = await axios.post('http://localhost:8000/api/chat', { text: userMessage });
+      const response = await axios.post(`${API_URL}/api/chat`, { text: userMessage });
       setMessages(prev => [...prev, { text: response.data.message, isUser: false }]);
     } catch (error) {
       console.error('Error sending message:', error);
