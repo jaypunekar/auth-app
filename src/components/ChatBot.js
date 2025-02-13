@@ -88,9 +88,9 @@ const ChatBot = () => {
     } catch (error) {
       console.error('Error sending message:', error);
       setMessages(prev => [...prev, { 
-        text: "**Error:** Sorry, there was an error processing your message. Please try again.", 
+        text: "I didn't quite get it. Can you please rephrase.", 
         isUser: false,
-        isError: true
+        isError: false
       }]);
     } finally {
       setSending(false);
