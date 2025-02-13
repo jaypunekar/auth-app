@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import './Register.css';
 import Navbar from './components/Navbar';
 
+const API_URL = process.env.REACT_APP_API_URL;
+
 function Register() {
   const [formData, setFormData] = useState({
     username: '',
@@ -49,7 +51,7 @@ function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/register', {
+      const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
