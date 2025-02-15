@@ -7,13 +7,12 @@ const API_URL = process.env.REACT_APP_API_URL;
 
 const INITIAL_DESCRIPTION = [
   {
-    text: `# Welcome to Google Ads Assistant
+    text: `# Welcome to AdTask AI Chatbot
 
-👋 Hey there! I'm your 🚀 Marketing & Ads Growth Assistant, here to help you launch high-performing Google Ads campaigns and grow your business 📈.
 
-🔍 I'll ask one question at a time to understand your needs and provide insights, smart suggestions, and best practices tailored just for you! 💡✨
+Hi, I’m AdTask AI, your digital marketing assistant. I’ll ask a few quick questions to understand your goals and provide tailored strategies across ads, social media, SEO, and more.
 
-🔥 Let's get started! First things first… What type of business are you advertising? 🏢💰🎯`,
+Let’s start! Tell me about your business?`,
     isUser: false,
     isDescription: true
   }
