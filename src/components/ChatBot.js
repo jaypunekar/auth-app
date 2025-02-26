@@ -5,54 +5,54 @@ import './ChatBot.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
 
-const INITIAL_DESCRIPTION = [
-  {
-    text: `# Welcome to AdTask AI Chatbot
-
-
-Hi, I’m AdTask AI, your digital marketing assistant. I’ll ask a few quick questions to understand your goals and provide tailored strategies across ads, social media, SEO, and more.
-
-Let’s start! Tell me about your business?`,
-    isUser: false,
-    isDescription: true
-  }
-];
-
 const ChatBot = () => {
-  const [messages, setMessages] = useState(INITIAL_DESCRIPTION);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [threadId, setThreadId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
 
+  useEffect(() => {
+    // Get chat history when component mounts
+    getChatHistory();
+  }, []);
+
+  const getChatHistory = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const userInfo = JSON.parse(localStorage.getItem('user_info'));
+      
+      const response = await axios.get(`${API_URL}/api/chat-history`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.data.messages.length > 0) {
+        setMessages(response.data.messages);
+      } else {
+        // If no history, show welcome message
+        setMessages([{
+          text: `# Welcome ${userInfo.first_name}! \n\nI'm AdTask AI, your digital marketing assistant. I'll help you create and manage your ad campaigns. What would you like to do today?`,
+          isUser: false,
+          isDescription: true
+        }]);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+      setLoading(false);
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
-    initializeChat();
-  }, []);
-
-  useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  const initializeChat = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/api/init-chat`, {}, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setThreadId(response.data.thread_id);
-    } catch (error) {
-      console.error('Error initializing chat:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const MessageContent = ({ message }) => {
     if (message.isUser) {
@@ -75,21 +75,36 @@ const ChatBot = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/api/chat`, 
+      console.log('Sending message:', userMessage); // Debug log
+
+      const response = await axios.post(
+        `${API_URL}/api/chat`, 
         { text: userMessage },
         {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         }
       );
-      setMessages(prev => [...prev, { text: response.data.message, isUser: false }]);
+
+      console.log('Received response:', response.data); // Debug log
+
+      // Handle the response
+      const assistantMessage = response.data.message || response.data;
+      setMessages(prev => [...prev, { 
+        text: typeof assistantMessage === 'string' ? assistantMessage : assistantMessage.message,
+        isUser: false 
+      }]);
     } catch (error) {
       console.error('Error sending message:', error);
+      console.error('Error details:', error.response?.data); // Log error details
+      
+      const errorMessage = error.response?.data?.detail || "Server error. Please try again later.";
       setMessages(prev => [...prev, { 
-        text: "I didn't quite get it. Can you please rephrase.", 
+        text: errorMessage,
         isUser: false,
-        isError: false
+        isError: true
       }]);
     } finally {
       setSending(false);

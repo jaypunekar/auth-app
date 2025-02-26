@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserProfile from './components/UserProfile';
 import ChatBot from './components/ChatBot';
+import Campaigns from './components/Campaigns';
 import './Protected.css';
 
 const API_URL = process.env.REACT_APP_API_URL;
@@ -9,6 +10,7 @@ const API_URL = process.env.REACT_APP_API_URL;
 function ProtectedPage() {
   const navigate = useNavigate();
   const [userInfo, setUserInfo] = useState(null);
+  const [showCampaigns, setShowCampaigns] = useState(false);
 
   useEffect(() => {
     const storedUserInfo = localStorage.getItem('user_info');
@@ -33,6 +35,11 @@ function ProtectedPage() {
     verifyToken();
   }, [navigate]);
 
+  const handleViewCampaigns = () => {
+    console.log('Opening campaigns modal'); // Debug log
+    setShowCampaigns(true);
+  };
+
   if (!userInfo) {
     return <div>Loading...</div>;
   }
@@ -41,12 +48,29 @@ function ProtectedPage() {
     <div className="protected-container">
       <header className="protected-header">
         <h1 className="app-title">adTask</h1>
-        <UserProfile userInfo={userInfo} />
+        <div className="header-actions">
+          <button 
+            className="view-campaigns-btn"
+            onClick={handleViewCampaigns}
+          >
+            View Campaigns
+          </button>
+          <UserProfile userInfo={userInfo} />
+        </div>
       </header>
       
       <div className="chatbot-container">
         <ChatBot />
       </div>
+
+      {showCampaigns && (
+        <Campaigns 
+          onClose={() => {
+            console.log('Closing campaigns modal'); // Debug log
+            setShowCampaigns(false);
+          }} 
+        />
+      )}
     </div>
   );
 }
