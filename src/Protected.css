@@ -74,4 +74,81 @@
 .view-campaigns-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(74, 108, 247, 0.2);
+}
+
+.create-meta-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #1877f2, #0a59c7);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.create-meta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.2);
+}
+
+.create-meta-btn:disabled {
+  background: linear-gradient(135deg, #89b9ff, #6494d6);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.view-amazon-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #ff9900, #ff5900);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.view-amazon-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 153, 0, 0.2);
+}
+
+.view-amazon-btn:disabled {
+  background: linear-gradient(135deg, #ffcc80, #ffab80);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.view-meta-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #1877f2, #0a59c7);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.view-meta-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.2);
+}
+
+.view-meta-btn:disabled {
+  background: linear-gradient(135deg, #89b9ff, #6494d6);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.meta-edit-button {
+  background: linear-gradient(135deg, #1877f2, #0a59c7);
+}
+
+.meta-edit-button:hover {
+  background: linear-gradient(135deg, #2a8cff, #1565c0);
 } 

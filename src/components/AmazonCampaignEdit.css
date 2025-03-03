@@ -1,0 +1,40 @@
+.amazon-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.amazon-edit-content {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* ... rest of the styles similar to MetaAdForm.css ... */
+
+.edit-button {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #ff9900, #ff5900);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.3s ease;
+}
+
+.edit-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 153, 0, 0.2);
+} 

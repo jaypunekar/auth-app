@@ -1,0 +1,32 @@
+.google-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100;
+}
+
+.google-edit-content {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.google-edit-button {
+  background: linear-gradient(135deg, #4285f4, #0d47a1);
+}
+
+.google-edit-button:hover {
+  background: linear-gradient(135deg, #5a95f5, #1565c0);
+}
+
+/* ... rest of the styles similar to AmazonCampaignEdit.css ... */ 
