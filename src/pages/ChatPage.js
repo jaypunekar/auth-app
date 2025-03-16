@@ -1,0 +1,1188 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Avatar,
+  CircularProgress,
+  Alert,
+  Grid,
+  Tabs,
+  Tab,
+  IconButton,
+  Tooltip,
+  Snackbar,
+} from "@mui/material";
+import {
+  Send as SendIcon,
+  Chat as ChatIcon,
+  SmartToy as BotIcon,
+  Mic as MicIcon,
+  MicOff as MicOffIcon,
+} from "@mui/icons-material";
+import { chatAPI } from "../services/api";
+import { keyframes } from "@mui/system";
+import CampaignPreviewDialog from "../components/CampaignPreviewDialog";
+import MultiPlatformPreviewDialog from "../components/MultiPlatformPreviewDialog";
+import { useNavigate } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import axios from "axios";
+
+// Define pulse animation
+const pulse = keyframes`
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+`;
+
+// Custom styles for Markdown content
+const markdownStyles = {
+  p: {
+    marginBottom: "0.5rem",
+    marginTop: "0.5rem",
+  },
+  h3: {
+    marginTop: "1rem",
+    marginBottom: "0.5rem",
+    fontWeight: "bold",
+    fontSize: "1.1rem",
+  },
+  h4: {
+    marginTop: "0.75rem",
+    marginBottom: "0.5rem",
+    fontWeight: "bold",
+    fontSize: "1rem",
+  },
+  ul: {
+    paddingLeft: "1.5rem",
+    marginBottom: "0.5rem",
+  },
+  ol: {
+    paddingLeft: "1.5rem",
+    marginBottom: "0.5rem",
+  },
+  li: {
+    marginBottom: "0.25rem",
+  },
+  a: {
+    color: "primary.main",
+    textDecoration: "underline",
+  },
+  code: {
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    padding: "0.1rem 0.2rem",
+    borderRadius: "3px",
+    fontFamily: "monospace",
+  },
+  pre: {
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    padding: "0.5rem",
+    borderRadius: "4px",
+    overflowX: "auto",
+    marginBottom: "0.5rem",
+  },
+  blockquote: {
+    borderLeft: "3px solid rgba(0, 0, 0, 0.1)",
+    paddingLeft: "1rem",
+    fontStyle: "italic",
+    margin: "0.5rem 0",
+  },
+  strong: {
+    fontWeight: "bold",
+  },
+  em: {
+    fontStyle: "italic",
+  },
+};
+
+// Message component with Markdown support
+const ChatMessage = ({ message }) => {
+  const isAssistant = message.role === "assistant";
+
+  return (
+    <ListItem
+      alignItems="flex-start"
+      sx={{ flexDirection: isAssistant ? "row" : "row-reverse" }}
+    >
+      <ListItemAvatar sx={{ minWidth: 40 }}>
+        <Avatar
+          sx={{
+            width: 32,
+            height: 32,
+            bgcolor: isAssistant ? "primary.main" : "secondary.main",
+            fontSize: "0.875rem",
+          }}
+        >
+          {isAssistant ? "AI" : "You"}
+        </Avatar>
+      </ListItemAvatar>
+      <ListItemText
+        primary={
+          <Box
+            sx={{
+              backgroundColor: isAssistant ? "primary.light" : "grey.100",
+              color: isAssistant ? "primary.contrastText" : "text.primary",
+              borderRadius: 2,
+              padding: 2,
+              maxWidth: "80%",
+              ml: isAssistant ? 0 : "auto",
+              mr: isAssistant ? "auto" : 0,
+            }}
+          >
+            {isAssistant ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ node, ...props }) => (
+                    <Typography
+                      variant="body2"
+                      sx={markdownStyles.p}
+                      {...props}
+                    />
+                  ),
+                  h3: ({ node, ...props }) => (
+                    <Typography
+                      variant="h6"
+                      sx={markdownStyles.h3}
+                      {...props}
+                    />
+                  ),
+                  h4: ({ node, ...props }) => (
+                    <Typography
+                      variant="subtitle1"
+                      sx={markdownStyles.h4}
+                      {...props}
+                    />
+                  ),
+                  ul: ({ node, ...props }) => (
+                    <Box component="ul" sx={markdownStyles.ul} {...props} />
+                  ),
+                  ol: ({ node, ...props }) => (
+                    <Box component="ol" sx={markdownStyles.ol} {...props} />
+                  ),
+                  li: ({ node, ...props }) => (
+                    <Box component="li" sx={markdownStyles.li} {...props} />
+                  ),
+                  a: ({ node, ...props }) => (
+                    <Box
+                      component="a"
+                      sx={markdownStyles.a}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      {...props}
+                    />
+                  ),
+                  code: ({ node, inline, ...props }) =>
+                    inline ? (
+                      <Box
+                        component="code"
+                        sx={markdownStyles.code}
+                        {...props}
+                      />
+                    ) : (
+                      <Box component="pre" sx={markdownStyles.pre} {...props} />
+                    ),
+                  blockquote: ({ node, ...props }) => (
+                    <Box
+                      component="blockquote"
+                      sx={markdownStyles.blockquote}
+                      {...props}
+                    />
+                  ),
+                  strong: ({ node, ...props }) => (
+                    <Box
+                      component="strong"
+                      sx={markdownStyles.strong}
+                      {...props}
+                    />
+                  ),
+                  em: ({ node, ...props }) => (
+                    <Box component="em" sx={markdownStyles.em} {...props} />
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            ) : (
+              <Typography variant="body2">{message.content}</Typography>
+            )}
+          </Box>
+        }
+        secondary={
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              display: "block",
+              textAlign: isAssistant ? "left" : "right",
+              mt: 0.5,
+            }}
+          >
+            {new Date(message.created_at).toLocaleTimeString()}
+          </Typography>
+        }
+        disableTypography
+      />
+    </ListItem>
+  );
+};
+
+const ChatPage = () => {
+  const [sessions, setSessions] = useState([]);
+  const [activeSession, setActiveSession] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  const messagesEndRef = useRef(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechRecognition, setSpeechRecognition] = useState(null);
+  const [transcript, setTranscript] = useState("");
+  const [autoSendVoice, setAutoSendVoice] = useState(true);
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
+  const [campaignData, setCampaignData] = useState(null);
+  const [multiPlatformDialogOpen, setMultiPlatformDialogOpen] = useState(false);
+  const [campaignDataList, setCampaignDataList] = useState([]);
+  const [currentPlatformIndex, setCurrentPlatformIndex] = useState(0);
+  const [createdCampaigns, setCreatedCampaigns] = useState([]);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const navigate = useNavigate();
+
+  // Fetch chat history for a session
+  const fetchChatHistory = useCallback(async (sessionId) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await chatAPI.getChatHistory(sessionId);
+      setMessages(response.data.messages);
+    } catch (err) {
+      setError("Failed to load chat history. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Handle message sending
+  const handleSendMessage = async (messageText) => {
+    if (!messageText.trim()) return;
+
+    setNewMessage("");
+    setLoading(true);
+
+    // Add the user message to the UI
+    const userMessage = {
+      id: Date.now(),
+      role: "user",
+      content: messageText,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
+
+    try {
+      // Send the message to the API
+      chatAPI
+        .sendMessage(activeSession.session_id, messageText)
+        .then((response) => {
+          // Add the assistant response to the UI
+          setMessages((prevMessages) => {
+            const updatedMessages = [...prevMessages, response.data];
+            // Check if the response contains campaign data
+            checkForCampaignData(response.data.content, updatedMessages);
+            return updatedMessages;
+          });
+
+          // Check if this is a Google Ads response
+          if (response.data.needs_google_account) {
+            // Show a notification that the user needs to link their Google Ads account
+            setSnackbarMessage(
+              "To create Google Ads, you need to link your Google Ads account first. Use the 'Link Google Ads' button in the top bar."
+            );
+            setSnackbarOpen(true);
+          }
+
+          // Check if Google Ads were created
+          if (response.data.google_ads_result) {
+            const { campaign_id, ad_group_id, ad_id } =
+              response.data.google_ads_result;
+            setSnackbarMessage(
+              `Google Ads campaign created successfully! Campaign ID: ${campaign_id}`
+            );
+            setSnackbarOpen(true);
+          }
+
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError("Failed to send message. Please try again.");
+          console.error(err);
+          setLoading(false);
+        });
+    } catch (err) {
+      setError("Failed to send message. Please try again.");
+      console.error(err);
+      setLoading(false);
+    }
+  };
+
+  // Check if the assistant response contains campaign data
+  const checkForCampaignData = async (content, allMessages) => {
+    // Check if the message indicates a campaign creation
+    const campaignCreationPhrases = [
+      "campaign has been created",
+      "created a draft campaign",
+      "i've created a campaign",
+      "your ad campaign is ready",
+      "campaign is now set up",
+      "campaign has been set up",
+      "i'll create a campaign for you",
+      "let me create a campaign",
+      "i can create this campaign",
+      "i will set up a campaign",
+      "i've set up a campaign",
+      "i've set up the campaign",
+      "i have set up a campaign",
+      "i have set up the campaign",
+      "i have created a campaign",
+      "i have created the campaign",
+      "set up the campaign for you",
+      "set up a campaign for you",
+      "created the campaign for you",
+      "created a campaign for you",
+    ];
+
+    const shouldCreateCampaign = campaignCreationPhrases.some((phrase) =>
+      content.toLowerCase().includes(phrase)
+    );
+
+    if (shouldCreateCampaign) {
+      // Get the full conversation history to extract more accurate data
+      const conversationHistory = allMessages
+        .map((msg) => msg.content)
+        .join("\n\n");
+
+      // Extract campaign data from the full conversation
+      await extractCampaignData(conversationHistory + "\n\n" + content);
+    }
+  };
+
+  // Function to complete missing campaign fields using Claude API
+  const completeWithClaude = async (campaignData) => {
+    try {
+      // Check if there are any missing fields that need completion
+      const needsCompletion =
+        !campaignData.keywords ||
+        !campaignData.headlines ||
+        !campaignData.descriptions ||
+        !campaignData.target_audience ||
+        !campaignData.platform_specific;
+
+      if (!needsCompletion) {
+        return campaignData; // No completion needed
+      }
+
+      console.log("Completing campaign data with Claude API");
+
+      // Prepare the prompt for Claude
+      const prompt = `
+      I need to complete missing fields for a ${
+        campaignData.platform
+      } ad campaign.
+      
+      Here's what I know about the campaign:
+      - Title: ${campaignData.title || "Not specified"}
+      - Description: ${campaignData.description || "Not specified"}
+      - Platform: ${campaignData.platform}
+      - Budget: ${campaignData.budget || "Not specified"} (${
+        campaignData.budget_type || "daily"
+      })
+      - Target Audience: ${JSON.stringify(campaignData.target_audience || {})}
+      
+      Please provide the following in JSON format:
+      1. Keywords (5-10 relevant keywords)
+      2. Headlines (3-5 compelling headlines, each under 30 characters)
+      3. Descriptions (2-3 descriptions, each under 90 characters)
+      4. Additional target audience details (age range, gender, interests, location)
+      5. Platform-specific details for ${campaignData.platform}
+      
+      Format your response as a valid JSON object with these keys: keywords, headlines, descriptions, target_audience, platform_specific
+      `;
+
+      // Call Claude API
+      const response = await axios.post(
+        "https://api.anthropic.com/v1/messages",
+        {
+          model: "claude-3-haiku-20240307",
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+          },
+        }
+      );
+
+      // Extract the JSON from Claude's response
+      const claudeResponse = response.data.content[0].text;
+      const jsonMatch = claudeResponse.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        const completionData = JSON.parse(jsonMatch[0]);
+
+        // Merge the completion data with the original campaign data
+        const completedData = {
+          ...campaignData,
+          keywords: campaignData.keywords || completionData.keywords || [],
+          headlines: campaignData.headlines || completionData.headlines || [],
+          descriptions:
+            campaignData.descriptions || completionData.descriptions || [],
+          target_audience: {
+            ...campaignData.target_audience,
+            ...(completionData.target_audience || {}),
+          },
+          platform_specific: {
+            ...campaignData.platform_specific,
+            ...(completionData.platform_specific || {}),
+          },
+        };
+
+        console.log("Completed campaign data:", completedData);
+        return completedData;
+      }
+
+      return campaignData; // Return original if completion failed
+    } catch (error) {
+      console.error("Error completing campaign data with Claude:", error);
+      return campaignData; // Return original on error
+    }
+  };
+
+  // Handle campaign preview dialog close
+  const handlePreviewDialogClose = async (success) => {
+    // Only close the dialog, don't create a campaign if success is false
+    setPreviewDialogOpen(false);
+
+    // If the dialog was cancelled, don't do anything else
+    if (!success) {
+      console.log("Campaign creation cancelled");
+    }
+  };
+
+  // Handle multi-platform preview dialog close
+  const handleMultiPlatformDialogClose = async (success) => {
+    // Only close the dialog, don't create campaigns if success is false
+    setMultiPlatformDialogOpen(false);
+
+    // If the dialog was cancelled, don't do anything else
+    if (!success) {
+      console.log("Multi-platform campaign creation cancelled");
+    }
+  };
+
+  // Extract campaign data from the message
+  const extractCampaignData = async (content) => {
+    // Try to extract platforms mentioned in the content
+    const platformMentions = extractPlatforms(content);
+
+    if (platformMentions.length > 0) {
+      // Create campaign data for each platform
+      const campaignDataList = await Promise.all(
+        platformMentions.map(async (platform) => {
+          const platformData = {
+            title:
+              extractTitle(content, platform) ||
+              `${platform} Campaign from Chat`,
+            description: `Generated ${platform} campaign from conversation with AI assistant`,
+            platform: platform,
+            target_audience: {
+              age_min: 25,
+              age_max: 45,
+              gender: "all",
+              location: extractLocation(content) || "United States",
+            },
+            budget: extractBudget(content) || "10.0",
+            budget_type: "daily",
+            start_date: new Date(),
+            end_date: new Date(new Date().setDate(new Date().getDate() + 30)),
+            keywords: extractKeywords(content, platform) || [],
+            headlines: extractHeadlines(content, platform) || [],
+            descriptions: extractDescriptions(content, platform) || [],
+          };
+
+          // Complete missing fields with Claude
+          return await completeWithClaude(platformData);
+        })
+      );
+
+      // Set the campaign data list and open the multi-platform preview dialog
+      setCampaignDataList(campaignDataList);
+      setMultiPlatformDialogOpen(true);
+    } else {
+      // Default to a single platform (Google) if no platforms are mentioned
+      let defaultData = {
+        title: extractTitle(content) || "Campaign from Chat",
+        description: "Generated from conversation with AI assistant",
+        platform: "Google",
+        target_audience: {
+          age_min: 25,
+          age_max: 45,
+          gender: "all",
+          location: extractLocation(content) || "United States",
+        },
+        budget: extractBudget(content) || "10.0",
+        budget_type: "daily",
+        start_date: new Date(),
+        end_date: new Date(new Date().setDate(new Date().getDate() + 30)),
+        keywords: extractKeywords(content) || [],
+        headlines: extractHeadlines(content) || [],
+        descriptions: extractDescriptions(content) || [],
+      };
+
+      // Complete missing fields with Claude
+      defaultData = await completeWithClaude(defaultData);
+
+      // Set the campaign data and open the preview dialog
+      setCampaignData(defaultData);
+      setPreviewDialogOpen(true);
+    }
+  };
+
+  // Extract platforms mentioned in the content
+  const extractPlatforms = (content) => {
+    const platformMap = {
+      google: "Google",
+      meta: "Meta",
+      facebook: "Meta",
+      instagram: "Meta",
+      linkedin: "LinkedIn",
+      tiktok: "TikTok",
+      pinterest: "Pinterest",
+      snapchat: "Snapchat",
+      reddit: "Reddit",
+    };
+
+    const platforms = new Set();
+    const lowerContent = content.toLowerCase();
+
+    // Look for platform mentions in the content
+    for (const [key, value] of Object.entries(platformMap)) {
+      if (lowerContent.includes(key)) {
+        platforms.add(value);
+      }
+    }
+
+    return Array.from(platforms);
+  };
+
+  // Extract location from content
+  const extractLocation = (content) => {
+    const locationRegex = /location[:\s]+([^\.]+)/i;
+    const match = content.match(locationRegex);
+    return match ? match[1].trim() : null;
+  };
+
+  // Extract budget from content
+  const extractBudget = (content) => {
+    const budgetRegex = /budget[:\s]+\$?(\d+)/i;
+    const match = content.match(budgetRegex);
+    return match ? match[1].trim() : null;
+  };
+
+  // Extract title from content, optionally for a specific platform
+  const extractTitle = (content, platform = null) => {
+    let titleRegex;
+    if (platform) {
+      titleRegex = new RegExp(
+        `${platform}[^"']*titled\\s+["']([^"']+)["']`,
+        "i"
+      );
+    } else {
+      titleRegex = /titled\s+["']([^"']+)["']/i;
+    }
+    const match = content.match(titleRegex);
+    return match ? match[1] : null;
+  };
+
+  // Extract keywords from content, optionally for a specific platform
+  const extractKeywords = (content, platform = null) => {
+    let keywordsSection;
+    if (platform) {
+      const platformKeywordsRegex = new RegExp(
+        `${platform}[^:]*keywords?[:\\s]+([^\\.]+)`,
+        "i"
+      );
+      keywordsSection = content.match(platformKeywordsRegex);
+    } else {
+      keywordsSection = content.match(/keywords?[:\s]+([^\.]+)/i);
+    }
+
+    if (keywordsSection) {
+      const keywordText = keywordsSection[1];
+      return keywordText
+        .split(/,|\sand\s|\n-\s/)
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0);
+    }
+    return null;
+  };
+
+  // Extract headlines from content, optionally for a specific platform
+  const extractHeadlines = (content, platform = null) => {
+    let headlinesSection;
+    if (platform) {
+      const platformHeadlinesRegex = new RegExp(
+        `${platform}[^:]*headlines?[:\\s]+([^\\.]+)`,
+        "i"
+      );
+      headlinesSection = content.match(platformHeadlinesRegex);
+    } else {
+      headlinesSection = content.match(/headlines?[:\s]+([^\.]+)/i);
+    }
+
+    if (headlinesSection) {
+      const headlineText = headlinesSection[1];
+      return headlineText
+        .split(/,|\sand\s|\n-\s/)
+        .map((h) => h.trim())
+        .filter((h) => h.length > 0);
+    }
+    return null;
+  };
+
+  // Extract descriptions from content, optionally for a specific platform
+  const extractDescriptions = (content, platform = null) => {
+    let descriptionsSection;
+    if (platform) {
+      const platformDescriptionsRegex = new RegExp(
+        `${platform}[^:]*descriptions?[:\\s]+([^\\.]+)`,
+        "i"
+      );
+      descriptionsSection = content.match(platformDescriptionsRegex);
+    } else {
+      descriptionsSection = content.match(/descriptions?[:\s]+([^\.]+)/i);
+    }
+
+    if (descriptionsSection) {
+      const descriptionText = descriptionsSection[1];
+      return descriptionText
+        .split(/,|\sand\s|\n-\s/)
+        .map((d) => d.trim())
+        .filter((d) => d.length > 0);
+    }
+    return null;
+  };
+
+  // Handle campaign creation success for a single platform
+  const handleCampaignSuccess = (campaign) => {
+    setSnackbarMessage(`Campaign "${campaign.title}" created successfully!`);
+    setSnackbarOpen(true);
+
+    // Add a message to the chat about the created campaign
+    const successMessage = {
+      id: Date.now(),
+      role: "assistant",
+      content: `I've created a campaign titled "${campaign.title}". You can view and edit it in the Campaigns section.`,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prevMessages) => [...prevMessages, successMessage]);
+
+    // Add to created campaigns list
+    setCreatedCampaigns((prev) => [...prev, campaign]);
+  };
+
+  // Handle completion of all platform campaigns
+  const handleAllCampaignsCompleted = (campaigns) => {
+    setSnackbarMessage(`${campaigns.length} campaigns created successfully!`);
+    setSnackbarOpen(true);
+
+    // Add a message to the chat about all created campaigns
+    const platformNames = campaigns.map((c) => c.platform).join(", ");
+    const successMessage = {
+      id: Date.now(),
+      role: "assistant",
+      content: `I've created ${campaigns.length} campaigns for the following platforms: ${platformNames}. You can view and edit them in the Campaigns section.`,
+      created_at: new Date().toISOString(),
+    };
+
+    setMessages((prevMessages) => [...prevMessages, successMessage]);
+
+    // Update created campaigns list
+    setCreatedCampaigns(campaigns);
+  };
+
+  // Handle snackbar close
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
+
+  // Navigate to campaigns page
+  const goToCampaigns = () => {
+    navigate("/campaigns");
+  };
+
+  // Update the sendMessage function to use handleSendMessage
+  const sendMessage = async (e) => {
+    e.preventDefault();
+    handleSendMessage(newMessage);
+  };
+
+  // Initialize speech recognition
+  useEffect(() => {
+    // Check if browser supports speech recognition
+    if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
+      const SpeechRecognition =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event) => {
+        const currentTranscript = Array.from(event.results)
+          .map((result) => result[0])
+          .map((result) => result.transcript)
+          .join("");
+
+        setTranscript(currentTranscript);
+        setNewMessage(currentTranscript);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      setSpeechRecognition(recognition);
+    }
+  }, []); // Initialize only once
+
+  // Handle auto-send when speech recognition ends
+  useEffect(() => {
+    // If speech recognition just ended and we have content
+    if (!isListening && autoSendVoice && transcript.trim()) {
+      // Small delay to ensure UI is updated
+      const timer = setTimeout(() => {
+        handleSendMessage(transcript);
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isListening, autoSendVoice, transcript, handleSendMessage]);
+
+  // Toggle speech recognition
+  const toggleListening = () => {
+    if (!speechRecognition) {
+      alert("Speech recognition is not supported in your browser.");
+      return;
+    }
+
+    if (isListening) {
+      speechRecognition.stop();
+      setIsListening(false);
+    } else {
+      setTranscript("");
+      speechRecognition.start();
+      setIsListening(true);
+    }
+  };
+
+  // Fetch chat sessions
+  const fetchSessions = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await chatAPI.getChatSessions();
+      setSessions(response.data);
+
+      // If there are sessions, set the first one as active
+      if (response.data.length > 0) {
+        setActiveSession(response.data[0]);
+        await fetchChatHistory(response.data[0].session_id);
+      }
+    } catch (err) {
+      setError("Failed to load chat sessions. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchChatHistory]);
+
+  // Fetch chat sessions on mount
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // Start a new chat session
+  const startNewChat = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await chatAPI.startChat();
+
+      // Add the new session to the list
+      setSessions((prevSessions) => [response.data, ...prevSessions]);
+
+      // Set the new session as active
+      setActiveSession(response.data);
+
+      // Set the welcome message
+      setMessages(response.data.messages);
+
+      // Switch to the chat tab
+      setTabValue(1);
+    } catch (err) {
+      console.error(err);
+
+      // Provide a more informative error message
+      let errorMessage = "Failed to start a new chat. Please try again.";
+
+      if (err.response) {
+        if (err.response.status === 500) {
+          errorMessage =
+            "Server error: The chat service is currently unavailable. This might be due to API configuration issues.";
+        } else if (err.response.data && err.response.data.detail) {
+          errorMessage = `Error: ${err.response.data.detail}`;
+        }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Handle session click
+  const handleSessionClick = useCallback(
+    async (session) => {
+      if (session.id === activeSession?.id) return;
+
+      setActiveSession(session);
+      await fetchChatHistory(session.session_id);
+      setTabValue(1);
+    },
+    [activeSession, fetchChatHistory]
+  );
+
+  // Handle tab change
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  return (
+    <Box>
+      <Typography variant="h4" component="h1" gutterBottom>
+        Chat with Ad Assistant
+      </Typography>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Paper
+        sx={{ p: 0, height: 600, display: "flex", flexDirection: "column" }}
+      >
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          aria-label="chat tabs"
+          sx={{ borderBottom: 1, borderColor: "divider" }}
+        >
+          <Tab label="Sessions" />
+          <Tab label="Chat" />
+        </Tabs>
+
+        <Box sx={{ display: "flex", flexGrow: 1, overflow: "hidden" }}>
+          {/* Sessions Panel */}
+          <Box
+            sx={{
+              width: 300,
+              borderRight: 1,
+              borderColor: "divider",
+              display: tabValue === 0 ? "block" : { xs: "none", md: "block" },
+              overflow: "auto",
+            }}
+          >
+            <Box sx={{ p: 2 }}>
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<ChatIcon />}
+                onClick={startNewChat}
+                disabled={loading}
+              >
+                New Chat
+              </Button>
+            </Box>
+
+            <Divider />
+
+            <List sx={{ p: 0 }}>
+              {sessions.map((session) => (
+                <ListItem
+                  key={session.id}
+                  button
+                  selected={session.id === activeSession?.id}
+                  onClick={() => handleSessionClick(session)}
+                >
+                  <ListItemAvatar>
+                    <Avatar>
+                      <ChatIcon />
+                    </Avatar>
+                  </ListItemAvatar>
+                  <ListItemText
+                    primary={
+                      session.created_at
+                        ? new Date(session.created_at).toLocaleDateString()
+                        : "New Chat"
+                    }
+                    secondary={`${session.messages.length} messages`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+
+          {/* Chat Panel */}
+          <Box
+            sx={{
+              flexGrow: 1,
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              display: tabValue === 1 ? "flex" : { xs: "flex", md: "flex" },
+            }}
+          >
+            {activeSession ? (
+              <>
+                <Box
+                  sx={{
+                    flexGrow: 1,
+                    overflow: "auto",
+                    p: 2,
+                    bgcolor: "background.default",
+                  }}
+                >
+                  <List>
+                    {messages.map((message) => (
+                      <ChatMessage key={message.id} message={message} />
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </List>
+
+                  {loading && (
+                    <Box
+                      sx={{ display: "flex", justifyContent: "center", p: 2 }}
+                    >
+                      <CircularProgress size={24} />
+                    </Box>
+                  )}
+                </Box>
+
+                {isListening && (
+                  <Box
+                    sx={{
+                      mb: 1,
+                      p: 1,
+                      borderRadius: 1,
+                      bgcolor: "primary.light",
+                      color: "primary.contrastText",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      mx: 2,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <MicIcon
+                        sx={{
+                          mr: 1,
+                          animation: `${pulse} 1.5s infinite ease-in-out`,
+                        }}
+                      />
+                      <Typography variant="body2">
+                        {transcript ? transcript : "Listening..."}
+                      </Typography>
+                    </Box>
+                    <Tooltip
+                      title={
+                        autoSendVoice
+                          ? "Auto-send enabled"
+                          : "Auto-send disabled"
+                      }
+                    >
+                      <Button
+                        size="small"
+                        variant={autoSendVoice ? "contained" : "outlined"}
+                        onClick={() => setAutoSendVoice(!autoSendVoice)}
+                        sx={{ ml: 1, minWidth: "auto", fontSize: "0.7rem" }}
+                      >
+                        Auto
+                      </Button>
+                    </Tooltip>
+                  </Box>
+                )}
+
+                <Box
+                  component="form"
+                  onSubmit={sendMessage}
+                  sx={{
+                    p: 2,
+                    borderTop: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <Grid container spacing={1} alignItems="center">
+                    <Grid item xs>
+                      <TextField
+                        fullWidth
+                        placeholder="Type your message..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        disabled={loading || isListening}
+                        variant="outlined"
+                        size="small"
+                      />
+                    </Grid>
+                    <Grid item>
+                      <Tooltip
+                        title={isListening ? "Stop listening" : "Voice input"}
+                      >
+                        <IconButton
+                          color={isListening ? "error" : "primary"}
+                          onClick={toggleListening}
+                          disabled={loading}
+                        >
+                          {isListening ? <MicOffIcon /> : <MicIcon />}
+                        </IconButton>
+                      </Tooltip>
+                    </Grid>
+                    <Grid item>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        endIcon={<SendIcon />}
+                        disabled={!newMessage.trim() || loading}
+                      >
+                        Send
+                      </Button>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </>
+            ) : (
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  p: 3,
+                }}
+              >
+                <BotIcon sx={{ fontSize: 64, color: "primary.main", mb: 2 }} />
+                <Typography variant="h6" gutterBottom>
+                  No active chat session
+                </Typography>
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  align="center"
+                  paragraph
+                >
+                  Start a new chat to begin talking with the ad assistant
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<ChatIcon />}
+                  onClick={startNewChat}
+                  disabled={loading}
+                >
+                  Start New Chat
+                </Button>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      </Paper>
+
+      {/* Campaign Preview Dialog */}
+      <CampaignPreviewDialog
+        open={previewDialogOpen}
+        onClose={handlePreviewDialogClose}
+        campaignData={campaignData}
+        onSuccess={handleCampaignSuccess}
+      />
+
+      {/* Multi-Platform Campaign Preview Dialog */}
+      <MultiPlatformPreviewDialog
+        open={multiPlatformDialogOpen}
+        onClose={handleMultiPlatformDialogClose}
+        campaignDataList={campaignDataList}
+        onSuccess={handleCampaignSuccess}
+        onAllCompleted={handleAllCampaignsCompleted}
+      />
+
+      {/* Success Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        message={snackbarMessage}
+        action={
+          <Button color="primary" size="small" onClick={goToCampaigns}>
+            View Campaigns
+          </Button>
+        }
+      />
+    </Box>
+  );
+};
+
+export default ChatPage;
