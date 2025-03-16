@@ -1,12 +1,18 @@
 import axios from 'axios';
 
+// Format the base URL to ensure it ends with /api
+const formatBaseUrl = (url) => {
+  if (!url) return 'http://localhost:8000/api';
+  return url.endsWith('/api') ? url : `${url}/api`;
+};
+
 // Create axios instance
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
+  baseURL: formatBaseUrl(process.env.REACT_APP_API_URL),
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
+  withCredentials: true, // Keep this for local development
 });
 
 // Add request interceptor to add auth token
@@ -28,6 +34,10 @@ api.interceptors.request.use(
 // Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
+    // If the response includes a token, save it
+    if (response.data && response.data.access_token) {
+      localStorage.setItem('token', response.data.access_token);
+    }
     return response;
   },
   (error) => {
