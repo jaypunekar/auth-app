@@ -24,15 +24,60 @@ api.interceptors.request.use(
       // Try direct localStorage access first for reliability
       token = localStorage.getItem('token');
       
+      // Log token details for debugging
+      if (token) {
+        console.log('Token found in localStorage:', {
+          length: token.length,
+          firstChars: token.substring(0, 10) + '...',
+          lastChars: '...' + token.substring(token.length - 10),
+          hasThreeParts: token.split('.').length === 3
+        });
+      } else {
+        console.log('No token found in localStorage');
+      }
+      
       // Check if token is valid
       if (token === 'undefined' || token === 'null' || !token) {
-        console.warn('Invalid token found in localStorage, clearing it');
-        localStorage.removeItem('token');
+        console.warn('Invalid token found in localStorage:', token);
+        // Don't clear token here, just log the issue
         token = null;
       } else if (!token.includes('.') || token.split('.').length !== 3) {
-        console.warn('Token does not appear to be a valid JWT, clearing it');
-        localStorage.removeItem('token');
+        console.warn('Token does not appear to be a valid JWT format:', {
+          parts: token.split('.').length,
+          containsDots: token.includes('.')
+        });
+        // Don't clear token here, just log the issue
         token = null;
+      } else {
+        // Try to parse the token to verify it's a valid JWT
+        try {
+          const [header, payload, signature] = token.split('.');
+          const decodedPayload = JSON.parse(atob(payload));
+          
+          // Check if token is expired
+          const expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
+          const currentTime = Date.now();
+          const isExpired = currentTime > expirationTime;
+          
+          if (isExpired) {
+            console.warn('Token is expired:', {
+              exp: new Date(expirationTime).toISOString(),
+              now: new Date(currentTime).toISOString(),
+              timeLeft: Math.floor((expirationTime - currentTime) / 1000) + ' seconds'
+            });
+            // Don't clear token here, just log the issue
+            token = null;
+          } else {
+            console.log('Token is valid and not expired:', {
+              exp: new Date(expirationTime).toISOString(),
+              timeLeft: Math.floor((expirationTime - currentTime) / 1000) + ' seconds'
+            });
+          }
+        } catch (parseError) {
+          console.error('Error parsing JWT token:', parseError);
+          // Don't clear token here, just log the issue
+          token = null;
+        }
       }
     } catch (error) {
       console.error('Error accessing token in interceptor:', error);
@@ -58,7 +103,7 @@ api.interceptors.request.use(
       // Log auth debug info
       console.log('Auth debug:', debugAuth());
       
-      // In production, redirect to login if not already there
+      // In production, redirect to login if not already there and not an auth endpoint
       if (process.env.NODE_ENV === 'production' && 
           !window.location.pathname.includes('/login') &&
           !config.url.includes('/auth/')) {

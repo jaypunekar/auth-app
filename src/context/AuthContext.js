@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import { getToken, storeToken, logout as authLogout, debugAuth } from '../utils/auth';
 
 // Create context
 const AuthContext = createContext();
@@ -14,38 +15,55 @@ export const AuthProvider = ({ children }) => {
   // Check if user is already logged in on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (token) {
-        try {
+      try {
+        console.log('Checking authentication on app start');
+        
+        // Get token using the utility function
+        const token = getToken();
+        
+        if (token) {
+          console.log('Token found, validating...');
+          
           // Set default auth header
           axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
-          // Get user info
-          const response = await axios.get('/api/auth/me');
-          
-          setUser(response.data);
-          setIsAuthenticated(true);
-        } catch (err) {
-          console.error('Authentication check failed:', err);
-          
-          // Only clear token if it's a 401 Unauthorized error
-          if (err.response && err.response.status === 401) {
-            // Clear invalid token
-            localStorage.removeItem('token');
-            delete axios.defaults.headers.common['Authorization'];
+          try {
+            // Get user info
+            console.log('Fetching user info to validate token');
+            const response = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/auth/me`);
             
-            setError('Session expired. Please login again.');
-          } else {
-            // For other errors (like network errors), don't clear the token
-            // but still set authenticated to false
-            setIsAuthenticated(false);
-            setError('Failed to verify authentication. Please try again later.');
+            console.log('User info retrieved successfully:', response.data);
+            setUser(response.data);
+            setIsAuthenticated(true);
+          } catch (userErr) {
+            console.error('Failed to get user info:', userErr);
+            
+            // Only clear token if it's a 401 Unauthorized error
+            if (userErr.response && userErr.response.status === 401) {
+              console.warn('Unauthorized error, clearing token');
+              // Clear invalid token
+              authLogout();
+              delete axios.defaults.headers.common['Authorization'];
+              
+              setError('Session expired. Please login again.');
+            } else {
+              // For other errors (like network errors), don't clear the token
+              // but still set authenticated to false
+              console.warn('Non-401 error, keeping token but setting not authenticated');
+              setIsAuthenticated(false);
+              setError('Failed to verify authentication. Please try again later.');
+            }
           }
+        } else {
+          console.log('No valid token found on app start');
+          setIsAuthenticated(false);
         }
+      } catch (err) {
+        console.error('Error during authentication check:', err);
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
     
     checkAuth();
@@ -57,8 +75,15 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
+      console.log('Attempting login for:', email);
+      
+      // Clear any existing token before login
+      authLogout();
+      delete axios.defaults.headers.common['Authorization'];
+      
       // Get token
-      const response = await axios.post('/api/auth/token', 
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || '/api'}/auth/token`, 
         new URLSearchParams({
           'username': email,
           'password': password
@@ -70,20 +95,49 @@ export const AuthProvider = ({ children }) => {
         }
       );
       
+      console.log('Login response received:', response.status);
+      
       const { access_token } = response.data;
       
-      // Save token
-      localStorage.setItem('token', access_token);
+      if (!access_token) {
+        console.error('No access token in response');
+        setError('Login failed: No access token received');
+        return false;
+      }
+      
+      console.log('Token received, length:', access_token.length);
+      
+      // Save token using the utility function
+      const tokenStored = storeToken(access_token);
+      
+      if (!tokenStored) {
+        console.error('Failed to store token');
+        setError('Login failed: Could not store authentication token');
+        return false;
+      }
+      
+      // Store user info if available
+      if (response.data.user_id) {
+        localStorage.setItem('user_id', response.data.user_id);
+      }
+      if (response.data.email) {
+        localStorage.setItem('user_email', response.data.email);
+      }
       
       // Set default auth header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       try {
         // Get user info
-        const userResponse = await axios.get('/api/auth/me');
+        console.log('Fetching user info after login');
+        const userResponse = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/auth/me`);
         
+        console.log('User info retrieved successfully');
         setUser(userResponse.data);
         setIsAuthenticated(true);
+        
+        // Log auth debug info
+        console.log('Auth state after login:', debugAuth());
         
         return true;
       } catch (userErr) {
@@ -109,7 +163,7 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       
       // Register user
-      await axios.post('/api/auth/register', {
+      await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/register`, {
         email,
         password
       });
@@ -130,24 +184,51 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       
+      // Clear any existing token before login
+      authLogout();
+      delete axios.defaults.headers.common['Authorization'];
+      
       // Get token
-      const response = await axios.post('/api/auth/google', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/google`, {
         token
       });
       
       const { access_token } = response.data;
       
-      // Save token
-      localStorage.setItem('token', access_token);
+      if (!access_token) {
+        console.error('No access token in Google login response');
+        setError('Google login failed: No access token received');
+        return false;
+      }
+      
+      // Save token using the utility function
+      const tokenStored = storeToken(access_token);
+      
+      if (!tokenStored) {
+        console.error('Failed to store token from Google login');
+        setError('Google login failed: Could not store authentication token');
+        return false;
+      }
+      
+      // Store user info if available
+      if (response.data.user_id) {
+        localStorage.setItem('user_id', response.data.user_id);
+      }
+      if (response.data.email) {
+        localStorage.setItem('user_email', response.data.email);
+      }
       
       // Set default auth header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
       // Get user info
-      const userResponse = await axios.get('/api/auth/me');
+      const userResponse = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/auth/me`);
       
       setUser(userResponse.data);
       setIsAuthenticated(true);
+      
+      // Log auth debug info
+      console.log('Auth state after Google login:', debugAuth());
       
       return true;
     } catch (err) {
@@ -160,8 +241,10 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = () => {
-    // Clear token
-    localStorage.removeItem('token');
+    console.log('Logging out user');
+    
+    // Use the utility function to clear auth data
+    authLogout();
     
     // Clear auth header
     delete axios.defaults.headers.common['Authorization'];

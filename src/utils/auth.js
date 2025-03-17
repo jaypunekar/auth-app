@@ -30,15 +30,7 @@ export const getToken = () => {
         token === null) {
       console.warn('Invalid token found in localStorage:', token);
       
-      // In production, try to redirect to login if token is invalid
-      if (process.env.NODE_ENV === 'production' && 
-          !window.location.pathname.includes('/login')) {
-        console.log('Redirecting to login due to invalid token');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      }
-      
+      // Don't redirect here, let the API interceptor handle redirects
       return null;
     }
     
@@ -46,16 +38,33 @@ export const getToken = () => {
     if (!token.includes('.') || token.split('.').length !== 3) {
       console.warn('Token does not appear to be a valid JWT:', token.substring(0, 10) + '...');
       
-      // In production, try to redirect to login if token is invalid
-      if (process.env.NODE_ENV === 'production' && 
-          !window.location.pathname.includes('/login')) {
-        console.log('Redirecting to login due to invalid JWT format');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
-      }
-      
+      // Don't redirect here, let the API interceptor handle redirects
       return null;
+    }
+    
+    // Check if token is expired
+    try {
+      const [header, payload, signature] = token.split('.');
+      const decodedPayload = JSON.parse(atob(payload));
+      
+      if (decodedPayload.exp) {
+        const expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
+        const currentTime = Date.now();
+        
+        if (currentTime > expirationTime) {
+          console.warn('Token is expired:', {
+            exp: new Date(expirationTime).toISOString(),
+            now: new Date(currentTime).toISOString(),
+            timeLeft: Math.floor((expirationTime - currentTime) / 1000) + ' seconds'
+          });
+          
+          // Don't redirect here, let the API interceptor handle redirects
+          return null;
+        }
+      }
+    } catch (parseError) {
+      console.error('Error parsing JWT token in getToken:', parseError);
+      // Continue with the token even if we can't parse it
     }
     
     return token;
@@ -93,6 +102,14 @@ export const storeToken = (token) => {
     
     // Verify it was stored correctly
     const storedToken = localStorage.getItem('token');
+    
+    // Log the stored token
+    console.log('Token stored successfully:', {
+      length: storedToken ? storedToken.length : 0,
+      preview: storedToken ? storedToken.substring(0, 10) + '...' : 'not stored',
+      matches: storedToken === token
+    });
+    
     return storedToken === token;
   } catch (error) {
     console.error('Error storing token:', error);
@@ -104,6 +121,7 @@ export const storeToken = (token) => {
  * Clear the authentication data from localStorage
  */
 export const logout = () => {
+  console.log('Logging out, clearing authentication data');
   localStorage.removeItem('token');
   localStorage.removeItem('user_id');
   localStorage.removeItem('user_email');
@@ -122,15 +140,37 @@ export const debugAuth = () => {
     // Check if token is a valid JWT
     const isValidJWT = token && token.includes('.') && token.split('.').length === 3;
     
+    // Check if token is expired
+    let isExpired = null;
+    let expirationTime = null;
+    
+    if (isValidJWT) {
+      try {
+        const [header, payload, signature] = token.split('.');
+        const decodedPayload = JSON.parse(atob(payload));
+        
+        if (decodedPayload.exp) {
+          expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
+          const currentTime = Date.now();
+          isExpired = currentTime > expirationTime;
+        }
+      } catch (parseError) {
+        console.error('Error parsing JWT token in debugAuth:', parseError);
+      }
+    }
+    
     return {
       hasToken: !!token,
       tokenValue: token ? `${token.substring(0, 10)}...` : 'Not found',
       tokenLength: token ? token.length : 0,
       isValidValue: token && token !== 'undefined' && token !== 'null',
       isValidJWT,
+      isExpired,
+      expirationTime: expirationTime ? new Date(expirationTime).toISOString() : null,
+      timeToExpiration: expirationTime ? Math.floor((expirationTime - Date.now()) / 1000) + ' seconds' : null,
       userId,
       userEmail,
-      isValid: token && token !== 'undefined' && token !== 'null' && isValidJWT
+      isValid: token && token !== 'undefined' && token !== 'null' && isValidJWT && !isExpired
     };
   } catch (error) {
     console.error('Error in debugAuth:', error);

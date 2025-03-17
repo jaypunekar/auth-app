@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Typography, Paper, CircularProgress, TextField } from '@mui/material';
+import { Box, Button, Typography, Paper, CircularProgress, TextField, Divider } from '@mui/material';
 import { debugAuth } from '../utils/auth';
 
 const ProductionDebug = () => {
@@ -7,6 +7,7 @@ const ProductionDebug = () => {
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [manualToken, setManualToken] = useState('');
+  const [tokenParts, setTokenParts] = useState({ header: null, payload: null, signature: null });
 
   useEffect(() => {
     // Check if debug mode is enabled via URL parameter or environment variable
@@ -18,10 +19,42 @@ const ProductionDebug = () => {
     
     // Get auth debug info
     updateDebugInfo();
+    
+    // Set up interval to refresh debug info every 5 seconds
+    const interval = setInterval(() => {
+      updateDebugInfo();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const updateDebugInfo = () => {
     const authDebugInfo = debugAuth();
+    
+    // Parse token if it exists
+    const token = localStorage.getItem('token');
+    let parsedTokenParts = { header: null, payload: null, signature: null };
+    
+    if (token && token.includes('.') && token.split('.').length === 3) {
+      try {
+        const [headerB64, payloadB64, signature] = token.split('.');
+        
+        // Decode header and payload
+        const header = JSON.parse(atob(headerB64));
+        const payload = JSON.parse(atob(payloadB64));
+        
+        parsedTokenParts = {
+          header,
+          payload,
+          signature: signature.substring(0, 10) + '...'
+        };
+        
+        setTokenParts(parsedTokenParts);
+      } catch (error) {
+        console.error('Error parsing JWT token:', error);
+      }
+    }
+    
     setDebugInfo({
       ...authDebugInfo,
       environment: {
@@ -35,7 +68,9 @@ const ProductionDebug = () => {
         token: localStorage.getItem('token'),
         user_id: localStorage.getItem('user_id'),
         user_email: localStorage.getItem('user_email')
-      }
+      },
+      tokenParts: parsedTokenParts,
+      timestamp: new Date().toISOString()
     });
   };
 
@@ -59,13 +94,26 @@ const ProductionDebug = () => {
     setTimeout(() => setLoading(false), 500);
   };
 
+  // Check token expiration
+  const isTokenExpired = () => {
+    if (tokenParts.payload && tokenParts.payload.exp) {
+      const expirationTime = tokenParts.payload.exp * 1000; // Convert to milliseconds
+      const currentTime = Date.now();
+      return currentTime > expirationTime;
+    }
+    return null; // Can't determine
+  };
+
   // Don't render anything if not visible
   if (!visible) return null;
 
   return (
-    <Paper elevation={3} sx={{ p: 3, mt: 2, mb: 2, position: 'fixed', bottom: 0, right: 0, maxWidth: '400px', zIndex: 9999 }}>
+    <Paper elevation={3} sx={{ p: 3, mt: 2, mb: 2, position: 'fixed', bottom: 0, right: 0, maxWidth: '500px', maxHeight: '80vh', overflow: 'auto', zIndex: 9999 }}>
       <Typography variant="h6" gutterBottom>
         Production Debug
+      </Typography>
+      <Typography variant="caption" display="block" gutterBottom>
+        Last updated: {debugInfo.timestamp}
       </Typography>
       
       <Box sx={{ mb: 2 }}>
@@ -74,6 +122,8 @@ const ProductionDebug = () => {
         <Typography variant="body2">API URL: {debugInfo.environment?.REACT_APP_API_URL}</Typography>
         <Typography variant="body2">Debug: {debugInfo.environment?.REACT_APP_DEBUG}</Typography>
       </Box>
+      
+      <Divider sx={{ my: 2 }} />
       
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1">Authentication:</Typography>
@@ -86,12 +136,32 @@ const ProductionDebug = () => {
         <Typography variant="body2">Email: {debugInfo.userEmail || 'Not found'}</Typography>
       </Box>
       
+      {tokenParts.payload && (
+        <>
+          <Divider sx={{ my: 2 }} />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="subtitle1">Token Details:</Typography>
+            <Typography variant="body2">Issuer (iss): {tokenParts.payload.iss || 'Not found'}</Typography>
+            <Typography variant="body2">Subject (sub): {tokenParts.payload.sub || 'Not found'}</Typography>
+            <Typography variant="body2">Issued At: {tokenParts.payload.iat ? new Date(tokenParts.payload.iat * 1000).toLocaleString() : 'Not found'}</Typography>
+            <Typography variant="body2">Expires At: {tokenParts.payload.exp ? new Date(tokenParts.payload.exp * 1000).toLocaleString() : 'Not found'}</Typography>
+            <Typography variant="body2" color={isTokenExpired() === true ? 'error' : isTokenExpired() === false ? 'success' : 'text.primary'}>
+              Status: {isTokenExpired() === true ? 'EXPIRED' : isTokenExpired() === false ? 'VALID' : 'UNKNOWN'}
+            </Typography>
+          </Box>
+        </>
+      )}
+      
+      <Divider sx={{ my: 2 }} />
+      
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1">Raw localStorage:</Typography>
         <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
           Token: {debugInfo.localStorage?.token ? `${debugInfo.localStorage.token.substring(0, 20)}...` : 'Not found'}
         </Typography>
       </Box>
+      
+      <Divider sx={{ my: 2 }} />
       
       <Box sx={{ mb: 2 }}>
         <TextField
