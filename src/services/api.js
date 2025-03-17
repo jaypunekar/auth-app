@@ -104,11 +104,18 @@ export const authAPI = {
       );
       
       console.log('Login response received:', response.status);
-      console.log('Login response data keys:', Object.keys(response.data));
+      console.log('Login response data:', JSON.stringify(response.data));
       
       // Store the token in localStorage
       if (response.data && response.data.access_token) {
         const token = response.data.access_token;
+        
+        // Validate token
+        if (!token || token === 'undefined' || token === undefined) {
+          console.error('Invalid token received:', token);
+          return response;
+        }
+        
         console.log('Token received, length:', token.length);
         console.log('Token first 10 chars:', token.substring(0, 10) + '...');
         
@@ -127,7 +134,7 @@ export const authAPI = {
           localStorage.setItem('user_email', response.data.email);
         }
       } else {
-        console.warn('No access_token found in login response. Response data:', response.data);
+        console.warn('No access_token found in login response. Response data:', JSON.stringify(response.data));
       }
       
       return response;
@@ -135,7 +142,7 @@ export const authAPI = {
       console.error('Login error:', error);
       if (error.response) {
         console.error('Error status:', error.response.status);
-        console.error('Error data:', error.response.data);
+        console.error('Error data:', JSON.stringify(error.response.data));
       }
       throw error;
     }

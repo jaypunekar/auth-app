@@ -12,7 +12,7 @@ import {
   Snackbar
 } from '@mui/material';
 import { authAPI } from '../services/api';
-import { debugAuth } from '../utils/auth';
+import { debugAuth, storeToken } from '../utils/auth';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -31,28 +31,61 @@ const Login = () => {
       // Log auth state before login
       console.log('Auth state before login:', debugAuth());
       
+      // Clear any existing token before login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('user_email');
+      
       // Attempt login
       const response = await authAPI.login(email, password);
       
-      // Log auth state after login
-      console.log('Auth state after login:', debugAuth());
-      
       // Check if login was successful
       if (response.data && response.data.access_token) {
-        console.log('Login successful, navigating to dashboard');
-        setShowSnackbar(true);
+        const token = response.data.access_token;
         
-        // Navigate to dashboard after a short delay
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
+        // Log token details
+        console.log('Token received from server:', {
+          length: token.length,
+          preview: token.substring(0, 10) + '...',
+          isString: typeof token === 'string',
+          isUndefined: token === 'undefined' || token === undefined
+        });
+        
+        // Manually store the token
+        if (token && token !== 'undefined' && token !== undefined) {
+          localStorage.setItem('token', token);
+          
+          // Store user info
+          if (response.data.user_id) {
+            localStorage.setItem('user_id', response.data.user_id);
+          }
+          if (response.data.email) {
+            localStorage.setItem('user_email', response.data.email);
+          }
+          
+          // Log auth state after login
+          console.log('Auth state after login:', debugAuth());
+          
+          console.log('Login successful, navigating to dashboard');
+          setShowSnackbar(true);
+          
+          // Navigate to dashboard after a short delay
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 1000);
+        } else {
+          setError('Login failed: Invalid token received');
+          console.error('Invalid token received:', token);
+        }
       } else {
         setError('Login failed: No access token received');
+        console.error('No access_token in response:', response.data);
       }
     } catch (err) {
       console.error('Login error:', err);
       
       if (err.response) {
+        console.error('Error response:', err.response.data);
         setError(`Login failed: ${err.response.data.detail || 'Unknown error'}`);
       } else {
         setError(`Login failed: ${err.message || 'Unknown error'}`);
