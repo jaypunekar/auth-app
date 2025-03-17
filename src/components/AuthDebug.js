@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Typography, Paper, CircularProgress } from '@mui/material';
 import api from '../services/api';
+import { debugAuth, getToken } from '../utils/auth';
 
 const AuthDebug = () => {
   const [debugInfo, setDebugInfo] = useState(null);
@@ -17,16 +18,9 @@ const AuthDebug = () => {
     
     setVisible(process.env.NODE_ENV === 'development' || debugParam === 'true' || debugEnv);
     
-    // Get info from localStorage
-    const token = localStorage.getItem('token');
-    const userId = localStorage.getItem('user_id');
-    const userEmail = localStorage.getItem('user_email');
-
-    setLocalStorageInfo({
-      token: token ? `${token.substring(0, 10)}...` : 'Not found',
-      userId: userId || 'Not found',
-      userEmail: userEmail || 'Not found'
-    });
+    // Get auth debug info
+    const authDebugInfo = debugAuth();
+    setLocalStorageInfo(authDebugInfo);
   }, []);
 
   const checkAuth = async () => {
@@ -60,9 +54,11 @@ const AuthDebug = () => {
       
       <Box sx={{ mb: 2 }}>
         <Typography variant="subtitle1">Local Storage:</Typography>
-        <Typography variant="body2">Token: {localStorageInfo.token}</Typography>
-        <Typography variant="body2">User ID: {localStorageInfo.userId}</Typography>
-        <Typography variant="body2">Email: {localStorageInfo.userEmail}</Typography>
+        <Typography variant="body2">Token: {localStorageInfo.tokenValue}</Typography>
+        <Typography variant="body2">Token Length: {localStorageInfo.tokenLength}</Typography>
+        <Typography variant="body2">Token Valid: {localStorageInfo.isValid ? 'Yes' : 'No'}</Typography>
+        <Typography variant="body2">User ID: {localStorageInfo.userId || 'Not found'}</Typography>
+        <Typography variant="body2">Email: {localStorageInfo.userEmail || 'Not found'}</Typography>
       </Box>
       
       <Button 

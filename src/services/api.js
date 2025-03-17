@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getToken, storeToken, logout, debugAuth } from '../utils/auth';
 
 // Determine if we're in production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -16,24 +17,26 @@ const api = axios.create({
 // Add request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Get the token using the utility function
+    const token = getToken();
     
     console.log('Request to:', config.url);
     console.log('Token available:', !!token);
     
     if (token) {
+      console.log('Token length:', token.length);
       console.log('Token first 10 chars:', token.substring(0, 10) + '...');
       
-      // Make sure we're using the correct format for the Authorization header
-      // Some backends expect "Bearer " prefix, others don't
-      if (!token.startsWith('Bearer ')) {
-        config.headers['Authorization'] = `Bearer ${token}`;
-      } else {
-        config.headers['Authorization'] = token;
-      }
+      // Add the token to the Authorization header
+      config.headers['Authorization'] = `Bearer ${token}`;
       
       // Log the full header for debugging
       console.log('Authorization header:', config.headers['Authorization']);
+    } else {
+      console.warn('No valid token found');
+      
+      // Log auth debug info
+      console.log('Auth debug:', debugAuth());
     }
     
     return config;
@@ -48,7 +51,8 @@ api.interceptors.response.use(
   (response) => {
     // If the response includes a token, store it
     if (response.data && response.data.access_token) {
-      localStorage.setItem('token', response.data.access_token);
+      console.log('Token received in response, storing it');
+      storeToken(response.data.access_token);
     }
     return response;
   },
@@ -68,8 +72,8 @@ api.interceptors.response.use(
       
       // Check if we're already on the login page to prevent redirect loops
       if (!window.location.pathname.includes('/login')) {
-        // Clear token
-        localStorage.removeItem('token');
+        // Clear token and redirect to login
+        logout();
         
         // Redirect to login
         window.location.href = '/login';
@@ -99,12 +103,21 @@ export const authAPI = {
         }
       );
       
-      console.log('Login response:', response.data);
+      console.log('Login response received:', response.status);
+      console.log('Login response data keys:', Object.keys(response.data));
       
       // Store the token in localStorage
       if (response.data && response.data.access_token) {
-        console.log('Storing token in localStorage, first 10 chars:', response.data.access_token.substring(0, 10) + '...');
-        localStorage.setItem('token', response.data.access_token);
+        const token = response.data.access_token;
+        console.log('Token received, length:', token.length);
+        console.log('Token first 10 chars:', token.substring(0, 10) + '...');
+        
+        // Store the token using the utility function
+        const stored = storeToken(token);
+        console.log('Token stored successfully:', stored);
+        
+        // Verify it was stored correctly
+        console.log('Auth debug after login:', debugAuth());
         
         // Also store user info if available
         if (response.data.user_id) {
@@ -114,7 +127,7 @@ export const authAPI = {
           localStorage.setItem('user_email', response.data.email);
         }
       } else {
-        console.warn('No access_token found in login response:', response.data);
+        console.warn('No access_token found in login response. Response data:', response.data);
       }
       
       return response;
