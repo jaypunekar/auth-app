@@ -18,9 +18,6 @@ import AdCampaignDetail from './pages/AdCampaignDetail';
 import CalendarPage from './pages/CalendarPage';
 import PageSpeedAnalysis from './pages/PageSpeedAnalysis';
 
-// Debug Component
-import ProductionDebug from './components/ProductionDebug';
-
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -68,9 +65,6 @@ function App() {
         {/* Redirect to login for any other route */}
         <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
-      
-      {/* Production Debug Component - will only show when debug mode is enabled */}
-      <ProductionDebug />
     </SnackbarProvider>
   );
 }
