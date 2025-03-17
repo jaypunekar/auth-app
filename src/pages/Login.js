@@ -28,6 +28,13 @@ const Login = () => {
     setError('');
     
     try {
+      // Log environment info
+      console.log('Environment:', {
+        NODE_ENV: process.env.NODE_ENV,
+        REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+        isProduction: process.env.NODE_ENV === 'production'
+      });
+      
       // Log auth state before login
       console.log('Auth state before login:', debugAuth());
       
@@ -38,6 +45,9 @@ const Login = () => {
       
       // Attempt login
       const response = await authAPI.login(email, password);
+      
+      console.log('Login response status:', response.status);
+      console.log('Login response data:', JSON.stringify(response.data, null, 2));
       
       // Check if login was successful
       if (response.data && response.data.access_token) {
@@ -53,39 +63,54 @@ const Login = () => {
         
         // Manually store the token
         if (token && token !== 'undefined' && token !== undefined) {
-          localStorage.setItem('token', token);
-          
-          // Store user info
-          if (response.data.user_id) {
-            localStorage.setItem('user_id', response.data.user_id);
+          // Direct localStorage access
+          try {
+            localStorage.setItem('token', token);
+            console.log('Token stored directly in localStorage');
+            
+            // Verify storage
+            const storedToken = localStorage.getItem('token');
+            console.log('Stored token verification:', {
+              length: storedToken ? storedToken.length : 0,
+              preview: storedToken ? storedToken.substring(0, 10) + '...' : 'not stored',
+              matches: storedToken === token
+            });
+            
+            // Store user info
+            if (response.data.user_id) {
+              localStorage.setItem('user_id', response.data.user_id);
+            }
+            if (response.data.email) {
+              localStorage.setItem('user_email', response.data.email);
+            }
+            
+            // Log auth state after login
+            console.log('Auth state after login:', debugAuth());
+            
+            console.log('Login successful, navigating to dashboard');
+            setShowSnackbar(true);
+            
+            // Navigate to dashboard after a short delay
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 1000);
+          } catch (storageError) {
+            console.error('Error storing token in localStorage:', storageError);
+            setError('Login failed: Could not store authentication token');
           }
-          if (response.data.email) {
-            localStorage.setItem('user_email', response.data.email);
-          }
-          
-          // Log auth state after login
-          console.log('Auth state after login:', debugAuth());
-          
-          console.log('Login successful, navigating to dashboard');
-          setShowSnackbar(true);
-          
-          // Navigate to dashboard after a short delay
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 1000);
         } else {
           setError('Login failed: Invalid token received');
           console.error('Invalid token received:', token);
         }
       } else {
         setError('Login failed: No access token received');
-        console.error('No access_token in response:', response.data);
+        console.error('No access_token in response:', JSON.stringify(response.data));
       }
     } catch (err) {
       console.error('Login error:', err);
       
       if (err.response) {
-        console.error('Error response:', err.response.data);
+        console.error('Error response:', JSON.stringify(err.response.data));
         setError(`Login failed: ${err.response.data.detail || 'Unknown error'}`);
       } else {
         setError(`Login failed: ${err.message || 'Unknown error'}`);

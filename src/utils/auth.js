@@ -19,6 +19,9 @@ export const getToken = () => {
   try {
     const token = localStorage.getItem('token');
     
+    // Log token retrieval for debugging
+    console.log('getToken called, raw token:', token ? `${token.substring(0, 10)}...` : 'null/undefined');
+    
     // Check for invalid token values
     if (!token || 
         token === 'undefined' || 
@@ -26,12 +29,32 @@ export const getToken = () => {
         token === undefined || 
         token === null) {
       console.warn('Invalid token found in localStorage:', token);
+      
+      // In production, try to redirect to login if token is invalid
+      if (process.env.NODE_ENV === 'production' && 
+          !window.location.pathname.includes('/login')) {
+        console.log('Redirecting to login due to invalid token');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+      
       return null;
     }
     
     // Check if token is a valid JWT (should have 3 parts separated by dots)
     if (!token.includes('.') || token.split('.').length !== 3) {
       console.warn('Token does not appear to be a valid JWT:', token.substring(0, 10) + '...');
+      
+      // In production, try to redirect to login if token is invalid
+      if (process.env.NODE_ENV === 'production' && 
+          !window.location.pathname.includes('/login')) {
+        console.log('Redirecting to login due to invalid JWT format');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+      
       return null;
     }
     
