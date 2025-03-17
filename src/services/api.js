@@ -1,18 +1,16 @@
 import axios from 'axios';
 
-// Format the base URL to ensure it ends with /api
-const formatBaseUrl = (url) => {
-  if (!url) return 'http://localhost:8000/api';
-  return url.endsWith('/api') ? url : `${url}/api`;
-};
+// Determine if we're in production
+const isProduction = process.env.NODE_ENV === 'production';
 
 // Create axios instance
 const api = axios.create({
-  baseURL: formatBaseUrl(process.env.REACT_APP_API_URL),
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Keep this for local development
+  // Only use credentials (cookies) in development, not in production
+  withCredentials: !isProduction,
 });
 
 // Add request interceptor to add auth token
@@ -34,7 +32,7 @@ api.interceptors.request.use(
 // Add response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    // If the response includes a token, save it
+    // If the response includes a token, store it
     if (response.data && response.data.access_token) {
       localStorage.setItem('token', response.data.access_token);
     }
@@ -71,17 +69,26 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   register: (email, password) => api.post('/auth/register', { email, password }),
-  login: (email, password) => api.post('/auth/token', 
-    new URLSearchParams({
-      'username': email,
-      'password': password
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
+  login: async (email, password) => {
+    const response = await api.post('/auth/token', 
+      new URLSearchParams({
+        'username': email,
+        'password': password
+      }),
+      {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
       }
+    );
+    
+    // Store the token in localStorage
+    if (response.data && response.data.access_token) {
+      localStorage.setItem('token', response.data.access_token);
     }
-  ),
+    
+    return response;
+  },
   googleLogin: (token) => api.post('/auth/google', { token }),
   getUser: () => api.get('/auth/me'),
 };
