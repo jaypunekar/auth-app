@@ -16,8 +16,8 @@ import {
 } from '@mui/material';
 import { Google as GoogleIcon } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
-import { authAPI } from '../services/api';
-import { debugAuth, storeToken } from '../utils/auth';
+import { authAPI } from '../../services/api';
+import { debugAuth, storeToken } from '../../utils/auth';
 
 const Login = () => {
   const { login, googleLogin, error, loading } = useAuth();
@@ -84,8 +84,8 @@ const Login = () => {
             
             // Try to parse the token to verify it's a valid JWT
             try {
-              const [header, payload, signature] = token.split('.');
-              const decodedPayload = JSON.parse(atob(payload));
+              const [headerPart, payloadPart, signaturePart] = token.split('.');
+              const decodedPayload = JSON.parse(atob(payloadPart));
               
               // Check if token has required fields
               if (!decodedPayload.exp || !decodedPayload.sub) {

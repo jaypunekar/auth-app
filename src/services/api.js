@@ -51,8 +51,8 @@ api.interceptors.request.use(
       } else {
         // Try to parse the token to verify it's a valid JWT
         try {
-          const [header, payload, signature] = token.split('.');
-          const decodedPayload = JSON.parse(atob(payload));
+          const [headerPart, payloadPart, signaturePart] = token.split('.');
+          const decodedPayload = JSON.parse(atob(payloadPart));
           
           // Check if token is expired
           const expirationTime = decodedPayload.exp * 1000; // Convert to milliseconds
