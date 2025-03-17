@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -33,6 +34,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameMon
 import { calendarAPI, adCampaignAPI } from '../services/api';
 
 const CalendarPage = () => {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarEntries, setCalendarEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -46,245 +48,60 @@ const CalendarPage = () => {
         setLoading(true);
         setError(null);
         
-        // Fetch calendar entries from the API
+        // Get token from localStorage
+        const token = localStorage.getItem('token');
+        
+        // Log token status for debugging
+        console.log('Calendar Page - Token check:', {
+          hasToken: !!token,
+          tokenLength: token ? token.length : 0,
+          tokenPreview: token ? `${token.substring(0, 10)}...${token.substring(token.length - 10)}` : 'No token'
+        });
+
+        if (!token) {
+          console.log('No valid token found, redirecting to login');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        // Fetch calendar entries
         const response = await calendarAPI.getEntries();
         
-        console.log('Raw calendar entries:', response.data);
+        // Check if we got an unauthorized response
+        if (response.error === 'Unauthorized') {
+          console.log('Received unauthorized response, redirecting to login');
+          navigate('/login', { replace: true });
+          return;
+        }
         
-        // Transform the data to match the expected format
-        const entries = await Promise.all(response.data.map(async entry => {
-          console.log(`Entry ${entry.id} ad_copy:`, entry.ad_copy);
-          
-          // Fetch campaign details to get budget information
-          let campaignDetails = {
-            title: entry.ad_campaign_title || 'Unknown Campaign',
-            platform: entry.ad_campaign_platform || 'Unknown Platform',
-            budget: '10.00',
-            budget_type: 'Daily'
-          };
-          
-          if (entry.ad_campaign_id) {
-            try {
-              const campaignResponse = await adCampaignAPI.getCampaign(entry.ad_campaign_id);
-              
-              if (campaignResponse.data) {
-                campaignDetails = {
-                  ...campaignDetails,
-                  ...campaignResponse.data,
-                  title: campaignResponse.data.title || campaignDetails.title,
-                  platform: campaignResponse.data.platform || campaignDetails.platform,
-                  budget: campaignResponse.data.budget || campaignDetails.budget,
-                  budget_type: campaignResponse.data.budget_type || campaignDetails.budget_type
-                };
-              }
-            } catch (err) {
-              console.error(`Error fetching campaign details for ID ${entry.ad_campaign_id}:`, err);
-            }
-          }
-          
-          // Parse the ad_copy to extract title, headline, etc.
-          let parsedAdCopy = {
-            part: '',
-            phase: '',
-            title: '',
-            headline: '',
-            description: '',
-            cta: '',
-            date_range: ''
-          };
-          
-          // First check if we have platform_data with headlines
-          if (campaignDetails.platform_data && typeof campaignDetails.platform_data === 'string') {
-            try {
-              const platformData = JSON.parse(campaignDetails.platform_data);
-              console.log('Platform data:', platformData);
-              
-              // Use platform_data if available
-              if (platformData.headlines && platformData.headlines.length > 0) {
-                parsedAdCopy.headline = platformData.headlines[0];
-                console.log('Using headline from platform_data:', parsedAdCopy.headline);
-              }
-              
-              if (platformData.unique_title) {
-                parsedAdCopy.title = platformData.unique_title;
-                console.log('Using title from platform_data:', parsedAdCopy.title);
-              }
-              
-              if (platformData.descriptions && platformData.descriptions.length > 0) {
-                parsedAdCopy.description = platformData.descriptions[0];
-              }
-              
-              if (platformData.phase) {
-                parsedAdCopy.phase = platformData.phase.toUpperCase();
-              }
-            } catch (err) {
-              console.error('Error parsing platform_data:', err);
-            }
-          }
-          
-          // Then try to parse ad_copy if available
-          if (entry.ad_copy) {
-            try {
-              // Check if ad_copy is a JSON string
-              if (entry.ad_copy.startsWith('{') && entry.ad_copy.includes('headline')) {
-                try {
-                  const adCopyJson = JSON.parse(entry.ad_copy);
-                  console.log('Parsed ad_copy JSON:', adCopyJson);
-                  
-                  // Extract data from JSON
-                  parsedAdCopy.headline = adCopyJson.headline || parsedAdCopy.headline;
-                  parsedAdCopy.description = adCopyJson.description || parsedAdCopy.description;
-                  parsedAdCopy.cta = adCopyJson.cta || parsedAdCopy.cta;
-                  
-                  // Check for additional fields
-                  if (adCopyJson.title) {
-                    parsedAdCopy.title = adCopyJson.title;
-                  }
-                  
-                  if (adCopyJson.part) {
-                    parsedAdCopy.part = `Part ${adCopyJson.part}`;
-                  }
-                  
-                  if (adCopyJson.phase) {
-                    parsedAdCopy.phase = adCopyJson.phase;
-                  }
-                  
-                  if (adCopyJson.date_range) {
-                    parsedAdCopy.date_range = adCopyJson.date_range;
-                  }
-                } catch (jsonErr) {
-                  console.error('Error parsing ad_copy as JSON:', jsonErr);
-                }
-              } else {
-                // Try to parse using regex patterns
-                const titleMatch = entry.ad_copy.match(/Title:\s*(.*?)(\n|$)/s);
-                const headlineMatch = entry.ad_copy.match(/Headline:\s*(.*?)(\n|$)/s);
-                const descriptionMatch = entry.ad_copy.match(/Description:\s*(.*?)(\n|$)/s);
-                const ctaMatch = entry.ad_copy.match(/CTA:\s*(.*?)(\n|$)/s);
-                const partMatch = entry.ad_copy.match(/Part\s+\d+:\s*(.*?)(\n|$)/s);
-                const durationMatch = entry.ad_copy.match(/Duration:\s*(.*?)(\n|$)/s);
-                
-                if (titleMatch || headlineMatch) {
-                  // Extract using regex
-                  if (titleMatch) {
-                    parsedAdCopy.title = titleMatch[1].trim();
-                    console.log('Extracted title from ad_copy:', parsedAdCopy.title);
-                  }
-                  
-                  if (headlineMatch) {
-                    parsedAdCopy.headline = headlineMatch[1].trim();
-                    console.log('Extracted headline from ad_copy:', parsedAdCopy.headline);
-                  }
-                  
-                  if (partMatch) {
-                    parsedAdCopy.part = partMatch[0].trim();
-                    if (partMatch[1]) {
-                      parsedAdCopy.phase = partMatch[1].trim();
-                    }
-                  }
-                  
-                  if (descriptionMatch) {
-                    parsedAdCopy.description = descriptionMatch[1].trim();
-                  }
-                  
-                  if (ctaMatch) {
-                    parsedAdCopy.cta = ctaMatch[1].trim();
-                  }
-                  
-                  if (durationMatch) {
-                    parsedAdCopy.date_range = durationMatch[1].trim();
-                  }
-                } else if (entry.ad_copy.includes('\n\n')) {
-                  // Try to parse using split method
-                  const parts = entry.ad_copy.split('\n\n');
-                  console.log('Split ad_copy parts:', parts);
-                  
-                  if (parts[0]) {
-                    parsedAdCopy.part = parts[0];
-                    const phaseParts = parts[0].split(': ');
-                    if (phaseParts.length > 1) {
-                      parsedAdCopy.phase = phaseParts[1];
-                    }
-                  }
-                  
-                  if (parts.length > 1 && parts[1].includes('Duration:')) {
-                    parsedAdCopy.date_range = parts[1].replace('Duration: ', '');
-                  }
-                  
-                  if (parts.length > 2 && parts[2].includes('Title:')) {
-                    parsedAdCopy.title = parts[2].replace('Title: ', '');
-                    console.log('Extracted title from split:', parsedAdCopy.title);
-                  }
-                  
-                  if (parts.length > 3 && parts[3].includes('Headline:')) {
-                    parsedAdCopy.headline = parts[3].replace('Headline: ', '');
-                    console.log('Extracted headline from split:', parsedAdCopy.headline);
-                  }
-                  
-                  if (parts.length > 4 && parts[4].includes('Description:')) {
-                    parsedAdCopy.description = parts[4].replace('Description: ', '');
-                  }
-                  
-                  if (parts.length > 5 && parts[5].includes('CTA:')) {
-                    parsedAdCopy.cta = parts[5].replace('CTA: ', '');
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('Error parsing ad_copy:', err);
-            }
-          }
-          
-          // If we still don't have a title but have a headline, use the headline as title
-          if (!parsedAdCopy.title && parsedAdCopy.headline) {
-            parsedAdCopy.title = parsedAdCopy.headline;
-          }
-          
-          // Ensure we have phase information
-          if (!parsedAdCopy.phase && parsedAdCopy.part && parsedAdCopy.part.includes('Part')) {
-            // Try to determine phase from part number
-            if (parsedAdCopy.part.includes('Part 1')) {
-              parsedAdCopy.phase = 'AWARENESS';
-            } else if (parsedAdCopy.part.includes('Part 2')) {
-              parsedAdCopy.phase = 'CONSIDERATION';
-            } else if (parsedAdCopy.part.includes('Part 3')) {
-              parsedAdCopy.phase = 'CONVERSION';
-            }
-          }
-          
-          // If we still don't have a phase, try to determine from campaign title
-          if (!parsedAdCopy.phase && campaignDetails.title) {
-            if (campaignDetails.title.includes('Awareness')) {
-              parsedAdCopy.phase = 'AWARENESS';
-            } else if (campaignDetails.title.includes('Consideration')) {
-              parsedAdCopy.phase = 'CONSIDERATION';
-            } else if (campaignDetails.title.includes('Conversion')) {
-              parsedAdCopy.phase = 'CONVERSION';
-            }
-          }
-          
-          console.log('Final parsed ad copy:', parsedAdCopy);
-          
-          return {
-            ...entry,
-            scheduled_date: new Date(entry.scheduled_date),
-            ad_campaign: campaignDetails,
-            parsed_ad_copy: parsedAdCopy
-          };
-        }));
+        if (!response || !response.data) {
+          throw new Error('Invalid response from calendar API');
+        }
         
-        setCalendarEntries(entries);
-        console.log('Fetched calendar entries with campaign details:', entries);
+        console.log('Calendar entries fetched successfully:', {
+          count: response.data.length,
+          entries: response.data
+        });
+        
+        setCalendarEntries(response.data);
       } catch (err) {
-        setError('Failed to load calendar entries. Please try again.');
         console.error('Error fetching calendar entries:', err);
+        
+        // Only redirect to login if it's a 401 error
+        if (err.response?.status === 401) {
+          console.log('Received 401 error, redirecting to login');
+          navigate('/login', { replace: true });
+          return;
+        }
+        
+        setError('Failed to fetch calendar entries. Please try again later.');
       } finally {
         setLoading(false);
       }
     };
     
     fetchCalendarEntries();
-  }, [currentDate]);
+  }, [currentDate, navigate]);
 
   const handlePreviousMonth = () => {
     const newDate = new Date(currentDate);
@@ -575,7 +392,7 @@ const CalendarPage = () => {
                                 fontSize: '0.7rem'
                               }}
                             >
-                              {entry.ad_campaign.title}
+                              {entry.campaign.title}
                             </Typography>
                           </CardContent>
                         </Card>
@@ -718,7 +535,7 @@ const CalendarPage = () => {
                     <>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Typography variant="h5" color="primary.main">
-                          {adCopyObj.phase || selectedEntry.ad_campaign.title}
+                          {adCopyObj.phase || selectedEntry.campaign.title}
                         </Typography>
                         <Chip
                           label={selectedEntry.status}
@@ -771,7 +588,7 @@ const CalendarPage = () => {
                                 Campaign
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.title || 'Unknown Campaign'}
+                                {selectedEntry.campaign.title || 'Unknown Campaign'}
                               </Typography>
                             </Box>
                             
@@ -780,7 +597,7 @@ const CalendarPage = () => {
                                 Platform
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.platform || 'Unknown Platform'}
+                                {selectedEntry.campaign.platform || 'Unknown Platform'}
                               </Typography>
                             </Box>
                             
@@ -806,7 +623,7 @@ const CalendarPage = () => {
                                 Daily Budget
                               </Typography>
                               <Typography variant="h6" color="primary.main">
-                                ${selectedEntry.ad_campaign?.budget || '10.00'}
+                                ${selectedEntry.campaign.budget || '10.00'}
                               </Typography>
                             </Box>
                             
@@ -815,7 +632,7 @@ const CalendarPage = () => {
                                 Budget Type
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.budget_type || 'Daily'}
+                                {selectedEntry.campaign.budget_type || 'Daily'}
                               </Typography>
                             </Box>
                             
@@ -824,7 +641,7 @@ const CalendarPage = () => {
                                 Estimated Monthly Spend
                               </Typography>
                               <Typography variant="body1">
-                                ${selectedEntry.ad_campaign?.budget ? (parseFloat(selectedEntry.ad_campaign.budget) * 30).toFixed(2) : '300.00'}
+                                ${selectedEntry.campaign.budget ? (parseFloat(selectedEntry.campaign.budget) * 30).toFixed(2) : '300.00'}
                               </Typography>
                             </Box>
                           </Paper>
@@ -852,7 +669,7 @@ const CalendarPage = () => {
                     <>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Typography variant="h5" color="primary.main">
-                          {selectedEntry.parsed_ad_copy.phase || selectedEntry.ad_campaign.title}
+                          {selectedEntry.parsed_ad_copy.phase || selectedEntry.campaign.title}
                         </Typography>
                         <Chip
                           label={selectedEntry.status}
@@ -905,7 +722,7 @@ const CalendarPage = () => {
                                 Campaign
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.title || 'Unknown Campaign'}
+                                {selectedEntry.campaign.title || 'Unknown Campaign'}
                               </Typography>
                             </Box>
                             
@@ -914,7 +731,7 @@ const CalendarPage = () => {
                                 Platform
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.platform || 'Unknown Platform'}
+                                {selectedEntry.campaign.platform || 'Unknown Platform'}
                               </Typography>
                             </Box>
                             
@@ -940,7 +757,7 @@ const CalendarPage = () => {
                                 Daily Budget
                               </Typography>
                               <Typography variant="h6" color="primary.main">
-                                ${selectedEntry.ad_campaign?.budget || '10.00'}
+                                ${selectedEntry.campaign.budget || '10.00'}
                               </Typography>
                             </Box>
                             
@@ -949,7 +766,7 @@ const CalendarPage = () => {
                                 Budget Type
                               </Typography>
                               <Typography variant="body1">
-                                {selectedEntry.ad_campaign?.budget_type || 'Daily'}
+                                {selectedEntry.campaign.budget_type || 'Daily'}
                               </Typography>
                             </Box>
                             
@@ -958,7 +775,7 @@ const CalendarPage = () => {
                                 Estimated Monthly Spend
                               </Typography>
                               <Typography variant="body1">
-                                ${selectedEntry.ad_campaign?.budget ? (parseFloat(selectedEntry.ad_campaign.budget) * 30).toFixed(2) : '300.00'}
+                                ${selectedEntry.campaign.budget ? (parseFloat(selectedEntry.campaign.budget) * 30).toFixed(2) : '300.00'}
                               </Typography>
                             </Box>
                           </Paper>

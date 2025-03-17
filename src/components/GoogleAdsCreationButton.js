@@ -48,6 +48,11 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
     isLinked: false,
     customerId: ''
   });
+  const [customerId, setCustomerId] = useState('');
+
+  // Add safe access variables
+  const isLinked = accountStatus?.isLinked || false;
+  const customerIdValue = accountStatus?.customerId || '';
 
   // Form data
   const [formData, setFormData] = useState({
@@ -101,15 +106,26 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   useEffect(() => {
     const checkAccountStatus = async () => {
       try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          console.log('No token found, skipping Google Ads account status check');
+          return;
+        }
+
         const response = await googleAdsApi.getAccountStatus();
-        if (response && response.data) {
-          setAccountStatus({
-            isLinked: response.data.is_linked || false,
-            customerId: response.data.customer_id || ''
-          });
+        
+        if (response.error === 'No valid token' || response.error === 'Unauthorized') {
+          console.log('Token validation failed, skipping Google Ads account status check');
+          return;
+        }
+
+        if (response.data && response.data.status) {
+          setAccountStatus(response.data.status);
+          setCustomerId(response.data.customer_id || '');
         }
       } catch (error) {
         console.error('Error checking Google Ads account status:', error);
+        setAccountStatus({ isLinked: false, customerId: '' });
       }
     };
 
@@ -227,13 +243,13 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
     }
   };
 
-  // Redirect to Google Ads manual creation page
-  const handleRedirectToGoogleAds = async () => {
+  // Rename the function to better reflect its new purpose
+  const handleCreateCampaignViaApi = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Format dates properly for the URL parameters
+      // Format dates properly for the API
       const formattedData = {
         ...formData,
         start_date: formData.start_date instanceof Date ? formData.start_date.toISOString().split('T')[0] : formData.start_date,
@@ -243,40 +259,31 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         keywords: formData.keywords.join('|')
       };
       
-      console.log('Redirecting to Google Ads with data:', formattedData);
+      console.log('Creating Google Ads campaign with data:', formattedData);
       
       // Check if the user has a Google Ads account
-      if (!accountStatus.isLinked || !accountStatus.customerId) {
+      if (!isLinked || !customerIdValue) {
         setError('You need to link your Google Ads account first. Please use the "Link Google Ads" button in the top bar.');
         setLoading(false);
         return;
       }
       
-      // Prepare URL parameters for Google Ads
-      const params = new URLSearchParams();
-      Object.entries(formattedData).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
+      // Add customer ID to the data
+      formattedData.customer_id = customerIdValue;
       
-      // Add customer ID
-      params.append('customer_id', accountStatus.customerId);
-      
-      // Construct the URL to Google Ads
-      const googleAdsUrl = `https://ads.google.com/aw/campaigns/new?${params.toString()}`;
-      
-      // Open Google Ads in a new tab
-      window.open(googleAdsUrl, '_blank');
+      // Call the API to create the campaign
+      const response = await googleAdsApi.createCampaign(formattedData);
       
       // Show success message
-      setSuccess('Redirected to Google Ads. Please check your new browser tab.');
+      setSuccess(`Campaign "${formattedData.campaign_name}" created successfully in Google Ads!`);
       
       // Close the dialog after a delay
       setTimeout(() => {
         handleClose();
       }, 3000);
     } catch (err) {
-      console.error('Error redirecting to Google Ads:', err);
-      setError('Failed to redirect to Google Ads. Please try again.');
+      console.error('Error creating Google Ads campaign:', err);
+      setError(err.response?.data?.detail || 'Failed to create Google Ads campaign. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -731,7 +738,7 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         </DialogTitle>
         
         <DialogContent dividers>
-          {!accountStatus.isLinked ? (
+          {!isLinked ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
               You need to link your Google Ads account before creating campaigns. Please use the "Link Google Ads" button in the top bar.
             </Alert>
@@ -767,7 +774,7 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
             Cancel
           </Button>
           
-          {accountStatus.isLinked && (
+          {isLinked && (
             <>
               {activeStep > 0 && (
                 <Button onClick={handleBack} color="inherit">
@@ -786,13 +793,13 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
                 </Button>
               ) : (
                 <Button 
-                  onClick={handleRedirectToGoogleAds} 
+                  onClick={handleCreateCampaignViaApi} 
                   variant="contained" 
                   color="primary"
-                  startIcon={<ExitToAppIcon />}
+                  startIcon={<GoogleIcon />}
                   disabled={loading}
                 >
-                  {loading ? <CircularProgress size={24} /> : 'Continue to Google Ads'}
+                  {loading ? <CircularProgress size={24} /> : 'Create Google Ads using API'}
                 </Button>
               )}
             </>

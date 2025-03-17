@@ -39,14 +39,12 @@ api.interceptors.request.use(
       // Check if token is valid
       if (token === 'undefined' || token === 'null' || !token) {
         console.warn('Invalid token found in localStorage:', token);
-        // Don't clear token here, just log the issue
         token = null;
       } else if (!token.includes('.') || token.split('.').length !== 3) {
         console.warn('Token does not appear to be a valid JWT format:', {
           parts: token.split('.').length,
           containsDots: token.includes('.')
         });
-        // Don't clear token here, just log the issue
         token = null;
       } else {
         // Try to parse the token to verify it's a valid JWT
@@ -65,8 +63,8 @@ api.interceptors.request.use(
               now: new Date(currentTime).toISOString(),
               timeLeft: Math.floor((expirationTime - currentTime) / 1000) + ' seconds'
             });
-            // Don't clear token here, just log the issue
             token = null;
+            localStorage.removeItem('token'); // Remove expired token
           } else {
             console.log('Token is valid and not expired:', {
               exp: new Date(expirationTime).toISOString(),
@@ -75,51 +73,26 @@ api.interceptors.request.use(
           }
         } catch (parseError) {
           console.error('Error parsing JWT token:', parseError);
-          // Don't clear token here, just log the issue
           token = null;
         }
       }
     } catch (error) {
       console.error('Error accessing token in interceptor:', error);
-      // Fall back to utility function
-      token = getToken();
+      token = null;
     }
     
-    console.log('Request to:', config.url);
-    console.log('Token available:', !!token);
+    // Only redirect to login if we're not already on the login page and not making an auth request
+    const isAuthRequest = config.url.includes('/auth/');
+    const isLoginPage = window.location.pathname.includes('/login');
+    
+    if (!token && !isAuthRequest && !isLoginPage) {
+      console.log('No valid token found, redirecting to login');
+      window.location.href = '/login';
+      return Promise.reject('No valid token');
+    }
     
     if (token) {
-      console.log('Token length:', token.length);
-      console.log('Token first 10 chars:', token.substring(0, 10) + '...');
-      
-      // Add the token to the Authorization header
       config.headers['Authorization'] = `Bearer ${token}`;
-      
-      // Log the full header for debugging
-      console.log('Authorization header:', config.headers['Authorization']);
-    } else {
-      console.warn('No valid token found');
-      
-      // Log auth debug info
-      console.log('Auth debug:', debugAuth());
-      
-      // In production, redirect to login if not already there and not an auth endpoint
-      if (process.env.NODE_ENV === 'production' && 
-          !window.location.pathname.includes('/login') &&
-          !window.location.pathname.includes('/register') &&
-          !config.url.includes('/auth/')) {
-        console.log('Redirecting to login due to missing token');
-        
-        // Don't redirect immediately, let the component handle it
-        // This prevents redirect loops
-        if (!window.isRedirecting) {
-          window.isRedirecting = true;
-          setTimeout(() => {
-            window.isRedirecting = false;
-            window.location.href = '/login';
-          }, 500);
-        }
-      }
     }
     
     return config;
@@ -144,64 +117,32 @@ api.interceptors.response.use(
         return response;
       }
       
-      // Direct localStorage access for reliability
-      try {
-        localStorage.setItem('token', token);
-        console.log('Token stored directly in localStorage from response interceptor');
-        
-        // Verify storage
-        const storedToken = localStorage.getItem('token');
-        console.log('Stored token verification in interceptor:', {
-          length: storedToken ? storedToken.length : 0,
-          preview: storedToken ? storedToken.substring(0, 10) + '...' : 'not stored',
-          matches: storedToken === token
-        });
-        
-        // Also store user info if available
-        if (response.data.user_id) {
-          localStorage.setItem('user_id', response.data.user_id);
-        }
-        if (response.data.email) {
-          localStorage.setItem('user_email', response.data.email);
-        }
-      } catch (storageError) {
-        console.error('Error storing token in localStorage from interceptor:', storageError);
+      // Store token in localStorage
+      localStorage.setItem('token', token);
+      console.log('Token stored in localStorage');
+      
+      // Also store user info if available
+      if (response.data.user_id) {
+        localStorage.setItem('user_id', response.data.user_id);
+      }
+      if (response.data.email) {
+        localStorage.setItem('user_email', response.data.email);
       }
     }
     return response;
   },
   (error) => {
-    // Don't handle errors for auth endpoints
-    const isAuthEndpoint = 
-      error.config && (
-        error.config.url.includes('/auth/token') || 
-        error.config.url.includes('/auth/register') || 
-        error.config.url.includes('/auth/google') ||
-        error.config.url.includes('/auth/me')
-      );
-    
-    // Handle 401 Unauthorized errors for non-auth endpoints
-    if (error.response && error.response.status === 401 && !isAuthEndpoint) {
-      console.error('Unauthorized access detected:', error.config.url);
-      console.error('Error data:', JSON.stringify(error.response.data, null, 2));
+    if (error.response && error.response.status === 401) {
+      // Only handle 401 errors for non-auth endpoints
+      const isAuthEndpoint = error.config.url.includes('/auth/');
+      const isLoginPage = window.location.pathname.includes('/login');
       
-      // Check if we're already on the login page to prevent redirect loops
-      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
-        // Clear token and redirect to login
-        logout();
-        
-        // Redirect to login, but prevent redirect loops
-        console.log('Redirecting to login due to 401 error');
-        if (!window.isRedirecting) {
-          window.isRedirecting = true;
-          setTimeout(() => {
-            window.isRedirecting = false;
-            window.location.href = '/login';
-          }, 500);
-        }
+      if (!isAuthEndpoint && !isLoginPage) {
+        console.error('Unauthorized access detected:', error.config.url);
+        localStorage.removeItem('token');
+        window.location.href = '/login';
       }
     }
-    
     return Promise.reject(error);
   }
 );
@@ -336,7 +277,74 @@ export const adCampaignAPI = {
 // Calendar API
 export const calendarAPI = {
   createEntry: (entry) => api.post('/calendar', entry),
-  getEntries: () => api.get('/calendar'),
+  getEntries: async () => {
+    try {
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      
+      // Log token status for debugging
+      console.log('Calendar API - Token check:', {
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        tokenPreview: token ? `${token.substring(0, 10)}...${token.substring(token.length - 10)}` : 'No token'
+      });
+
+      if (!token) {
+        console.error('No token found for calendar API call');
+        throw new Error('No valid token');
+      }
+
+      // Make the request using the axios instance which already handles auth headers
+      const response = await api.get('/calendar');
+      
+      if (!response || !response.data) {
+        throw new Error('Invalid response from calendar API');
+      }
+      
+      // Transform the response data
+      const transformedData = await Promise.all(response.data.map(async entry => {
+        let campaignDetails = {
+          title: entry.ad_campaign_title || 'Unknown Campaign',
+          platform: entry.ad_campaign_platform || 'Unknown Platform',
+          budget: '10.00',
+          budget_type: 'Daily'
+        };
+
+        // Fetch campaign details if available
+        if (entry.ad_campaign_id) {
+          try {
+            const campaignResponse = await adCampaignAPI.getCampaign(entry.ad_campaign_id);
+            if (campaignResponse.data) {
+              campaignDetails = {
+                ...campaignDetails,
+                ...campaignResponse.data
+              };
+            }
+          } catch (err) {
+            console.error(`Error fetching campaign details for ID ${entry.ad_campaign_id}:`, err);
+          }
+        }
+
+        // Parse ad copy
+        const parsedAdCopy = parseAdCopy(entry.ad_copy, campaignDetails.platform_data);
+
+        return {
+          ...entry,
+          ...parsedAdCopy,
+          campaign: campaignDetails
+        };
+      }));
+
+      return { ...response, data: transformedData };
+    } catch (error) {
+      console.error('Calendar API Error:', error);
+      if (error.response?.status === 401) {
+        // Don't throw here, let the component handle the 401
+        return { data: [], error: 'Unauthorized' };
+      }
+      throw error;
+    }
+  },
   getEntriesByCampaign: (campaignId) => api.get(`/calendar/campaign/${campaignId}`),
   getEntry: (id) => api.get(`/calendar/${id}`),
   updateEntry: (id, entry) => api.put(`/calendar/${id}`, entry),
@@ -344,12 +352,119 @@ export const calendarAPI = {
   generateCalendar: (request) => api.post('/calendar/generate', request),
 };
 
+const parseAdCopy = (adCopy, platformData = null) => {
+  const parsedData = {
+    part: '',
+    phase: '',
+    title: '',
+    headline: '',
+    description: '',
+    cta: '',
+    date_range: ''
+  };
+
+  // First check platform_data
+  if (platformData) {
+    try {
+      const data = typeof platformData === 'string' ? JSON.parse(platformData) : platformData;
+      if (data.headlines?.length > 0) parsedData.headline = data.headlines[0];
+      if (data.unique_title) parsedData.title = data.unique_title;
+      if (data.descriptions?.length > 0) parsedData.description = data.descriptions[0];
+      if (data.phase) parsedData.phase = data.phase.toUpperCase();
+    } catch (err) {
+      console.error('Error parsing platform_data:', err);
+    }
+  }
+
+  // Then parse ad_copy
+  if (adCopy) {
+    try {
+      if (adCopy.startsWith('{')) {
+        const data = JSON.parse(adCopy);
+        parsedData.headline = data.headline || parsedData.headline;
+        parsedData.description = data.description || parsedData.description;
+        parsedData.cta = data.cta || parsedData.cta;
+        parsedData.title = data.title || parsedData.title;
+        parsedData.part = data.part ? `Part ${data.part}` : parsedData.part;
+        parsedData.phase = data.phase || parsedData.phase;
+        parsedData.date_range = data.date_range || parsedData.date_range;
+      } else {
+        // Parse using regex
+        const matches = {
+          title: adCopy.match(/Title:\s*(.*?)(\n|$)/s),
+          headline: adCopy.match(/Headline:\s*(.*?)(\n|$)/s),
+          description: adCopy.match(/Description:\s*(.*?)(\n|$)/s),
+          cta: adCopy.match(/CTA:\s*(.*?)(\n|$)/s),
+          part: adCopy.match(/Part\s+\d+:\s*(.*?)(\n|$)/s),
+          duration: adCopy.match(/Duration:\s*(.*?)(\n|$)/s)
+        };
+
+        if (matches.title) parsedData.title = matches.title[1].trim();
+        if (matches.headline) parsedData.headline = matches.headline[1].trim();
+        if (matches.description) parsedData.description = matches.description[1].trim();
+        if (matches.cta) parsedData.cta = matches.cta[1].trim();
+        if (matches.part) {
+          parsedData.part = matches.part[0].trim();
+          if (matches.part[1]) parsedData.phase = matches.part[1].trim();
+        }
+        if (matches.duration) parsedData.date_range = matches.duration[1].trim();
+      }
+    } catch (err) {
+      console.error('Error parsing ad_copy:', err);
+    }
+  }
+
+  // Set phase based on part number if not already set
+  if (!parsedData.phase && parsedData.part) {
+    if (parsedData.part.includes('Part 1')) parsedData.phase = 'AWARENESS';
+    else if (parsedData.part.includes('Part 2')) parsedData.phase = 'CONSIDERATION';
+    else if (parsedData.part.includes('Part 3')) parsedData.phase = 'CONVERSION';
+  }
+
+  // Use headline as title if title is missing
+  if (!parsedData.title && parsedData.headline) {
+    parsedData.title = parsedData.headline;
+  }
+
+  return parsedData;
+};
+
 // Google Ads API
 export const googleAdsAPI = {
   linkAccount: (data) => api.post('/google-ads/link-account', data),
-  getAccountStatus: () => api.get('/google-ads/account-status'),
+  getAccountStatus: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found for Google Ads API call');
+        return { data: null, error: 'No valid token' };
+      }
+      return await api.get('/google-ads/account-status');
+    } catch (error) {
+      console.error('Error getting Google Ads account status:', error);
+      if (error.response?.status === 401) {
+        return { data: null, error: 'Unauthorized' };
+      }
+      throw error;
+    }
+  },
   createCampaign: (data) => api.post('/google-ads/create-campaign', data),
-  getCampaigns: () => api.get('/google-ads/campaigns'),
+  getCampaigns: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found for Google Ads API call');
+        return { data: null, error: 'No valid token' };
+      }
+      return await api.get('/google-ads/campaigns');
+    } catch (error) {
+      console.error('Error getting Google Ads campaigns:', error);
+      if (error.response?.status === 401) {
+        return { data: null, error: 'Unauthorized' };
+      }
+      throw error;
+    }
+  },
   updateCampaign: (campaignId, data) => api.put(`/google-ads/campaigns/${campaignId}`, data),
 };
 
