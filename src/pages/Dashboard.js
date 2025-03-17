@@ -35,6 +35,7 @@ import {
   Update as UpdateIcon,
 } from '@mui/icons-material';
 import { adCampaignAPI, googleAdsAPI } from '../services/api';
+import AuthDebug from '../components/AuthDebug';
 
 // Helper function to group campaigns by platform
 const groupCampaignsByPlatform = (campaigns) => {
@@ -535,6 +536,9 @@ const Dashboard = () => {
           {snackbarMessage}
         </Alert>
       </Snackbar>
+
+      {/* Add the AuthDebug component */}
+      <AuthDebug />
     </Box>
   );
 };

@@ -18,8 +18,22 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     
+    console.log('Request to:', config.url);
+    console.log('Token available:', !!token);
+    
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      console.log('Token first 10 chars:', token.substring(0, 10) + '...');
+      
+      // Make sure we're using the correct format for the Authorization header
+      // Some backends expect "Bearer " prefix, others don't
+      if (!token.startsWith('Bearer ')) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        config.headers['Authorization'] = token;
+      }
+      
+      // Log the full header for debugging
+      console.log('Authorization header:', config.headers['Authorization']);
     }
     
     return config;
@@ -70,24 +84,48 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (email, password) => api.post('/auth/register', { email, password }),
   login: async (email, password) => {
-    const response = await api.post('/auth/token', 
-      new URLSearchParams({
-        'username': email,
-        'password': password
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+    try {
+      console.log('Attempting login for:', email);
+      
+      const response = await api.post('/auth/token', 
+        new URLSearchParams({
+          'username': email,
+          'password': password
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
         }
+      );
+      
+      console.log('Login response:', response.data);
+      
+      // Store the token in localStorage
+      if (response.data && response.data.access_token) {
+        console.log('Storing token in localStorage, first 10 chars:', response.data.access_token.substring(0, 10) + '...');
+        localStorage.setItem('token', response.data.access_token);
+        
+        // Also store user info if available
+        if (response.data.user_id) {
+          localStorage.setItem('user_id', response.data.user_id);
+        }
+        if (response.data.email) {
+          localStorage.setItem('user_email', response.data.email);
+        }
+      } else {
+        console.warn('No access_token found in login response:', response.data);
       }
-    );
-    
-    // Store the token in localStorage
-    if (response.data && response.data.access_token) {
-      localStorage.setItem('token', response.data.access_token);
+      
+      return response;
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
     }
-    
-    return response;
   },
   googleLogin: (token) => api.post('/auth/google', { token }),
   getUser: () => api.get('/auth/me'),

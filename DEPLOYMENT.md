@@ -59,6 +59,21 @@ Common issues:
 - **CORS Errors**: The backend is not configured to allow requests from your Amplify domain
 - **Cookie Issues**: Cross-domain cookies require specific configurations
 
+#### Using the Debug Tool
+
+The application includes a built-in authentication debug tool that can help diagnose issues:
+
+1. **In Development**: The debug tool is automatically available in development mode
+2. **In Production**: You can enable the debug tool by:
+   - Setting the `REACT_APP_DEBUG` environment variable to `true` in Amplify Console
+   - Adding `?debug=true` to the URL (e.g., `https://prod.adtask.ai/dashboard?debug=true`)
+
+The debug tool will show:
+- The JWT token stored in localStorage (first 10 characters)
+- User information stored in localStorage
+- A button to test authentication with the backend
+- The response from the backend, including authentication status
+
 ### 5. Monitoring and Debugging
 
 1. Use the AWS Amplify Console to view build logs and deployment status
