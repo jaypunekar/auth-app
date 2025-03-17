@@ -106,11 +106,19 @@ api.interceptors.request.use(
       // In production, redirect to login if not already there and not an auth endpoint
       if (process.env.NODE_ENV === 'production' && 
           !window.location.pathname.includes('/login') &&
+          !window.location.pathname.includes('/register') &&
           !config.url.includes('/auth/')) {
         console.log('Redirecting to login due to missing token');
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 100);
+        
+        // Don't redirect immediately, let the component handle it
+        // This prevents redirect loops
+        if (!window.isRedirecting) {
+          window.isRedirecting = true;
+          setTimeout(() => {
+            window.isRedirecting = false;
+            window.location.href = '/login';
+          }, 500);
+        }
       }
     }
     
@@ -178,13 +186,19 @@ api.interceptors.response.use(
       console.error('Error data:', JSON.stringify(error.response.data, null, 2));
       
       // Check if we're already on the login page to prevent redirect loops
-      if (!window.location.pathname.includes('/login')) {
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
         // Clear token and redirect to login
         logout();
         
-        // Redirect to login
+        // Redirect to login, but prevent redirect loops
         console.log('Redirecting to login due to 401 error');
-        window.location.href = '/login';
+        if (!window.isRedirecting) {
+          window.isRedirecting = true;
+          setTimeout(() => {
+            window.isRedirecting = false;
+            window.location.href = '/login';
+          }, 500);
+        }
       }
     }
     

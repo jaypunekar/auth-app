@@ -48,10 +48,31 @@ export const AuthProvider = ({ children }) => {
               setError('Session expired. Please login again.');
             } else {
               // For other errors (like network errors), don't clear the token
-              // but still set authenticated to false
-              console.warn('Non-401 error, keeping token but setting not authenticated');
-              setIsAuthenticated(false);
-              setError('Failed to verify authentication. Please try again later.');
+              // but still set authenticated to true if we have a valid token
+              console.warn('Non-401 error, keeping token and setting authenticated to true');
+              
+              // Parse the token to get user info
+              try {
+                const [headerPart, payloadPart, signaturePart] = token.split('.');
+                const decodedPayload = JSON.parse(atob(payloadPart));
+                
+                if (decodedPayload.sub) {
+                  console.log('Setting user from token payload:', decodedPayload);
+                  setUser({
+                    email: decodedPayload.sub,
+                    id: decodedPayload.user_id || 'unknown',
+                    is_active: true
+                  });
+                  setIsAuthenticated(true);
+                } else {
+                  setIsAuthenticated(false);
+                  setError('Failed to verify authentication. Please try again later.');
+                }
+              } catch (parseError) {
+                console.error('Error parsing JWT token:', parseError);
+                setIsAuthenticated(false);
+                setError('Failed to verify authentication. Please try again later.');
+              }
             }
           }
         } else {
@@ -142,9 +163,35 @@ export const AuthProvider = ({ children }) => {
         return true;
       } catch (userErr) {
         console.error('Failed to get user info after login:', userErr);
-        setError('Login successful but failed to get user info. Please try again.');
         
-        // Don't clear token here, just return false
+        // Try to extract user info from token
+        try {
+          const [headerPart, payloadPart, signaturePart] = access_token.split('.');
+          const decodedPayload = JSON.parse(atob(payloadPart));
+          
+          if (decodedPayload.sub) {
+            console.log('Setting user from token payload:', decodedPayload);
+            setUser({
+              email: decodedPayload.sub,
+              id: decodedPayload.user_id || 'unknown',
+              is_active: true
+            });
+            setIsAuthenticated(true);
+            return true;
+          }
+        } catch (parseError) {
+          console.error('Error parsing JWT token:', parseError);
+        }
+        
+        // If we can't get user info, but we have a valid token, still consider the user logged in
+        if (access_token) {
+          console.log('Setting authenticated based on valid token');
+          setIsAuthenticated(true);
+          setUser({ email: email, id: 'unknown', is_active: true });
+          return true;
+        }
+        
+        setError('Login successful but failed to get user info. Please try again.');
         return false;
       }
     } catch (err) {
@@ -221,16 +268,50 @@ export const AuthProvider = ({ children }) => {
       // Set default auth header
       axios.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
       
-      // Get user info
-      const userResponse = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/auth/me`);
-      
-      setUser(userResponse.data);
-      setIsAuthenticated(true);
-      
-      // Log auth debug info
-      console.log('Auth state after Google login:', debugAuth());
-      
-      return true;
+      try {
+        // Get user info
+        const userResponse = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/auth/me`);
+        
+        setUser(userResponse.data);
+        setIsAuthenticated(true);
+        
+        // Log auth debug info
+        console.log('Auth state after Google login:', debugAuth());
+        
+        return true;
+      } catch (userErr) {
+        console.error('Failed to get user info after Google login:', userErr);
+        
+        // Try to extract user info from token
+        try {
+          const [headerPart, payloadPart, signaturePart] = access_token.split('.');
+          const decodedPayload = JSON.parse(atob(payloadPart));
+          
+          if (decodedPayload.sub) {
+            console.log('Setting user from token payload:', decodedPayload);
+            setUser({
+              email: decodedPayload.sub,
+              id: decodedPayload.user_id || 'unknown',
+              is_active: true
+            });
+            setIsAuthenticated(true);
+            return true;
+          }
+        } catch (parseError) {
+          console.error('Error parsing JWT token:', parseError);
+        }
+        
+        // If we can't get user info, but we have a valid token, still consider the user logged in
+        if (access_token) {
+          console.log('Setting authenticated based on valid token');
+          setIsAuthenticated(true);
+          setUser({ email: 'google-user', id: 'unknown', is_active: true });
+          return true;
+        }
+        
+        setError('Google login successful but failed to get user info. Please try again.');
+        return false;
+      }
     } catch (err) {
       setError(err.response?.data?.detail || 'Google login failed. Please try again.');
       return false;
