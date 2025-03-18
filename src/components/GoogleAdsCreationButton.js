@@ -48,11 +48,6 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
     isLinked: false,
     customerId: ''
   });
-  const [customerId, setCustomerId] = useState('');
-
-  // Add safe access variables
-  const isLinked = accountStatus?.isLinked || false;
-  const customerIdValue = accountStatus?.customerId || '';
 
   // Form data
   const [formData, setFormData] = useState({
@@ -106,26 +101,15 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   useEffect(() => {
     const checkAccountStatus = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, skipping Google Ads account status check');
-          return;
-        }
-
         const response = await googleAdsApi.getAccountStatus();
-        
-        if (response.error === 'No valid token' || response.error === 'Unauthorized') {
-          console.log('Token validation failed, skipping Google Ads account status check');
-          return;
-        }
-
-        if (response.data && response.data.status) {
-          setAccountStatus(response.data.status);
-          setCustomerId(response.data.customer_id || '');
+        if (response && response.data) {
+          setAccountStatus({
+            isLinked: response.data.is_linked || false,
+            customerId: response.data.customer_id || ''
+          });
         }
       } catch (error) {
         console.error('Error checking Google Ads account status:', error);
-        setAccountStatus({ isLinked: false, customerId: '' });
       }
     };
 
@@ -262,14 +246,14 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
       console.log('Creating Google Ads campaign with data:', formattedData);
       
       // Check if the user has a Google Ads account
-      if (!isLinked || !customerIdValue) {
+      if (!accountStatus.isLinked || !accountStatus.customerId) {
         setError('You need to link your Google Ads account first. Please use the "Link Google Ads" button in the top bar.');
         setLoading(false);
         return;
       }
       
       // Add customer ID to the data
-      formattedData.customer_id = customerIdValue;
+      formattedData.customer_id = accountStatus.customerId;
       
       // Call the API to create the campaign
       const response = await googleAdsApi.createCampaign(formattedData);
@@ -738,7 +722,7 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         </DialogTitle>
         
         <DialogContent dividers>
-          {!isLinked ? (
+          {!accountStatus.isLinked ? (
             <Alert severity="warning" sx={{ mb: 2 }}>
               You need to link your Google Ads account before creating campaigns. Please use the "Link Google Ads" button in the top bar.
             </Alert>
@@ -774,7 +758,7 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
             Cancel
           </Button>
           
-          {isLinked && (
+          {accountStatus.isLinked && (
             <>
               {activeStep > 0 && (
                 <Button onClick={handleBack} color="inherit">

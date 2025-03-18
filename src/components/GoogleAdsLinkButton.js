@@ -23,8 +23,8 @@ import googleAdsApi from '../services/googleAdsApi';
 const GoogleAdsLinkButton = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [accountType, setAccountType] = useState('new');
   const [customerId, setCustomerId] = useState('');
   const [accountStatus, setAccountStatus] = useState({
@@ -32,29 +32,19 @@ const GoogleAdsLinkButton = () => {
     customerId: ''
   });
 
-  // Check if the user has a linked Google Ads account
+  // Check if the user already has a linked account
   useEffect(() => {
     const checkAccountStatus = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          console.log('No token found, skipping Google Ads account status check');
-          return;
-        }
-
         const response = await googleAdsApi.getAccountStatus();
-        
-        if (response.error === 'No valid token' || response.error === 'Unauthorized') {
-          console.log('Token validation failed, skipping Google Ads account status check');
-          return;
-        }
-
-        if (response.data && response.data.status) {
-          setAccountStatus(response.data.status);
+        if (response && response.data) {
+          setAccountStatus({
+            isLinked: response.data.is_linked || false,
+            customerId: response.data.customer_id || ''
+          });
         }
       } catch (error) {
         console.error('Error checking Google Ads account status:', error);
-        setAccountStatus({ isLinked: false, customerId: '' });
       }
     };
 
@@ -63,8 +53,8 @@ const GoogleAdsLinkButton = () => {
 
   const handleOpen = () => {
     setOpen(true);
-    setError(null);
-    setSuccess(null);
+    setError('');
+    setSuccess('');
   };
 
   const handleClose = () => {
@@ -81,8 +71,8 @@ const GoogleAdsLinkButton = () => {
 
   const handleLinkAccount = async () => {
     setLoading(true);
-    setError(null);
-    setSuccess(null);
+    setError('');
+    setSuccess('');
 
     try {
       const requestData = {
@@ -109,28 +99,25 @@ const GoogleAdsLinkButton = () => {
     }
   };
 
-  const isLinked = accountStatus?.isLinked || false;
-  const customerIdValue = accountStatus?.customerId || '';
-
   return (
     <>
       <Button
         variant="contained"
-        color={isLinked ? "success" : "primary"}
-        startIcon={isLinked ? <CheckCircleIcon /> : <GoogleIcon />}
+        color={accountStatus.isLinked ? "success" : "primary"}
+        startIcon={accountStatus.isLinked ? <CheckCircleIcon /> : <GoogleIcon />}
         onClick={handleOpen}
         sx={{ ml: 2 }}
       >
-        {isLinked ? 'Google Ads Linked' : 'Link Google Ads'}
+        {accountStatus.isLinked ? 'Google Ads Linked' : 'Link Google Ads'}
       </Button>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>Link Google Ads Account</DialogTitle>
         <DialogContent>
-          {isLinked ? (
+          {accountStatus.isLinked ? (
             <Box sx={{ my: 2 }}>
               <Alert severity="success">
-                Your Google Ads account is already linked. Customer ID: {customerIdValue}
+                Your Google Ads account is already linked. Customer ID: {accountStatus.customerId}
               </Alert>
             </Box>
           ) : (
@@ -189,7 +176,7 @@ const GoogleAdsLinkButton = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Close</Button>
-          {!isLinked && (
+          {!accountStatus.isLinked && (
             <Button 
               onClick={handleLinkAccount} 
               variant="contained" 

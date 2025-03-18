@@ -432,39 +432,9 @@ const parseAdCopy = (adCopy, platformData = null) => {
 // Google Ads API
 export const googleAdsAPI = {
   linkAccount: (data) => api.post('/google-ads/link-account', data),
-  getAccountStatus: async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.warn('No token found for Google Ads API call');
-        return { data: null, error: 'No valid token' };
-      }
-      return await api.get('/google-ads/account-status');
-    } catch (error) {
-      console.error('Error getting Google Ads account status:', error);
-      if (error.response?.status === 401) {
-        return { data: null, error: 'Unauthorized' };
-      }
-      throw error;
-    }
-  },
+  getAccountStatus: () => api.get('/google-ads/account-status'),
   createCampaign: (data) => api.post('/google-ads/create-campaign', data),
-  getCampaigns: async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.warn('No token found for Google Ads API call');
-        return { data: null, error: 'No valid token' };
-      }
-      return await api.get('/google-ads/campaigns');
-    } catch (error) {
-      console.error('Error getting Google Ads campaigns:', error);
-      if (error.response?.status === 401) {
-        return { data: null, error: 'Unauthorized' };
-      }
-      throw error;
-    }
-  },
+  getCampaigns: () => api.get('/google-ads/campaigns'),
   updateCampaign: (campaignId, data) => api.put(`/google-ads/campaigns/${campaignId}`, data),
 };
 
