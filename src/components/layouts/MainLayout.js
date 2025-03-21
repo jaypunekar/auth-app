@@ -23,11 +23,11 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Chat as ChatIcon,
-  CalendarMonth as CalendarIcon,
   Add as AddIcon,
   Person as PersonIcon,
   Logout as LogoutIcon,
   Speed as SpeedIcon,
+  CalendarMonth as CalendarIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -61,8 +61,8 @@ const MainLayout = () => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Chat with Assistant', icon: <ChatIcon />, path: '/chat' },
-    { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
+    { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
   ];
 
   const drawer = (
@@ -197,4 +197,4 @@ const MainLayout = () => {
   );
 };
 
-export default MainLayout; 
+export default MainLayout;

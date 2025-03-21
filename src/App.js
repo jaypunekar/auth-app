@@ -15,8 +15,8 @@ import Dashboard from './pages/Dashboard';
 import ChatPage from './pages/ChatPage';
 import AdCampaignForm from './pages/AdCampaignForm';
 import AdCampaignDetail from './pages/AdCampaignDetail';
-import CalendarPage from './pages/CalendarPage';
 import PageSpeedAnalysis from './pages/PageSpeedAnalysis';
+import AdCalendar from './pages/AdCalendar';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -58,8 +58,8 @@ function App() {
           <Route path="campaigns/new" element={<AdCampaignForm />} />
           <Route path="campaigns/edit/:id" element={<AdCampaignForm />} />
           <Route path="campaigns/:id" element={<AdCampaignDetail />} />
-          <Route path="calendar" element={<CalendarPage />} />
           <Route path="pagespeed" element={<PageSpeedAnalysis />} />
+          <Route path="adcalendar" element={<AdCalendar />} />
         </Route>
 
         {/* Redirect to login for any other route */}

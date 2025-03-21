@@ -238,9 +238,9 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         ...formData,
         start_date: formData.start_date instanceof Date ? formData.start_date.toISOString().split('T')[0] : formData.start_date,
         end_date: formData.end_date instanceof Date ? formData.end_date.toISOString().split('T')[0] : formData.end_date,
-        headlines: formData.headlines.join('|'),
-        descriptions: formData.descriptions.join('|'),
-        keywords: formData.keywords.join('|')
+        headlines: formData.headlines,
+        descriptions: formData.descriptions,
+        keywords: formData.keywords
       };
       
       console.log('Creating Google Ads campaign with data:', formattedData);

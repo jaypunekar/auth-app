@@ -84,6 +84,47 @@ const googleAdsApi = {
       }
       throw error;
     }
+  },
+
+  // Get responsive search ads for a campaign
+  getResponsiveSearchAds: async (campaignId, adGroupId = null) => {
+    try {
+      console.log(`Fetching responsive search ads for campaign ${campaignId}...`);
+      const url = adGroupId 
+        ? `/google-ads/responsive-search-ads?campaign_id=${campaignId}&ad_group_id=${adGroupId}`
+        : `/google-ads/responsive-search-ads?campaign_id=${campaignId}`;
+      
+      const response = await api.get(url);
+      console.log('Responsive search ads response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error getting responsive search ads for campaign ${campaignId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Update a responsive search ad
+  updateResponsiveSearchAd: async (adId, adData) => {
+    try {
+      console.log(`Updating responsive search ad ${adId} with data:`, adData);
+      const response = await api.put(`/google-ads/responsive-search-ad`, {
+        ad_id: adId,
+        ...adData
+      });
+      console.log('Responsive search ad update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error updating responsive search ad ${adId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
   }
 };
 

@@ -26,8 +26,10 @@ import {
   SmartToy as BotIcon,
   Mic as MicIcon,
   MicOff as MicOffIcon,
+  ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon,
 } from "@mui/icons-material";
-import { chatAPI } from "../services/api";
+import { chatAPI, feedbackAPI } from "../services/api";
 import { keyframes } from "@mui/system";
 import CampaignPreviewDialog from "../components/CampaignPreviewDialog";
 import MultiPlatformPreviewDialog from "../components/MultiPlatformPreviewDialog";
@@ -115,6 +117,114 @@ const markdownStyles = {
 // Message component with Markdown support
 const ChatMessage = ({ message }) => {
   const isAssistant = message.role === "assistant";
+  const [feedbackState, setFeedbackState] = useState({
+    loading: false,
+    feedback: null, // null = no feedback, true = thumbs up, false = thumbs down
+    feedbackId: null,
+  });
+  
+  // Check if the message contains an image
+  const [hasImage, setHasImage] = useState(false);
+  const [imageData, setImageData] = useState(null);
+  
+  // Parse message for image data
+  useEffect(() => {
+    if (isAssistant && message.content) {
+      try {
+        // Try to parse potential JSON content
+        if (message.content.includes('"display_type":"image"') || 
+            message.content.includes('"file_info"')) {
+          
+          // Find JSON in message content - look for the first { and the matching }
+          let jsonContent = null;
+          const startIdx = message.content.indexOf('{');
+          if (startIdx >= 0) {
+            let braceCount = 0;
+            let endIdx = -1;
+            
+            for (let i = startIdx; i < message.content.length; i++) {
+              if (message.content[i] === '{') braceCount++;
+              if (message.content[i] === '}') braceCount--;
+              
+              if (braceCount === 0) {
+                endIdx = i;
+                break;
+              }
+            }
+            
+            if (endIdx > startIdx) {
+              try {
+                jsonContent = JSON.parse(message.content.substring(startIdx, endIdx + 1));
+              } catch (e) {
+                console.error("Error parsing potential JSON in message:", e);
+              }
+            }
+          }
+          
+          // Check if we found valid image data
+          if (jsonContent && 
+              jsonContent.display_type === 'image' && 
+              jsonContent.file_info) {
+            
+            setHasImage(true);
+            setImageData({
+              fileInfo: jsonContent.file_info,
+              thumbnail: jsonContent.file_info.thumbnail,
+              prompt: jsonContent.prompt || '',
+              additionalText: jsonContent.additional_text || ''
+            });
+            
+            // Continue processing the rest of the message
+          }
+        }
+      } catch (error) {
+        console.error("Error parsing message content for image:", error);
+      }
+    }
+  }, [isAssistant, message.content]);
+
+  // Handle feedback button click
+  const handleFeedback = async (isPositive) => {
+    // Skip if not an assistant message
+    if (!isAssistant) return;
+    
+    // If already giving the same feedback, remove it
+    if (feedbackState.feedback === isPositive) {
+      try {
+        setFeedbackState((prev) => ({ ...prev, loading: true }));
+        
+        // If we have a feedback ID, delete it
+        if (feedbackState.feedbackId) {
+          await feedbackAPI.deleteFeedback(feedbackState.feedbackId);
+        }
+        
+        setFeedbackState({
+          loading: false,
+          feedback: null,
+          feedbackId: null,
+        });
+      } catch (error) {
+        console.error("Error removing feedback:", error);
+        setFeedbackState((prev) => ({ ...prev, loading: false }));
+      }
+    } else {
+      // Otherwise, submit new or update existing feedback
+      try {
+        setFeedbackState((prev) => ({ ...prev, loading: true }));
+        
+        const response = await feedbackAPI.submitFeedback(message.id, isPositive);
+        
+        setFeedbackState({
+          loading: false,
+          feedback: isPositive,
+          feedbackId: response.data.id,
+        });
+      } catch (error) {
+        console.error("Error submitting feedback:", error);
+        setFeedbackState((prev) => ({ ...prev, loading: false }));
+      }
+    }
+  };
 
   return (
     <ListItem
@@ -141,85 +251,166 @@ const ChatMessage = ({ message }) => {
               color: isAssistant ? "primary.contrastText" : "text.primary",
               borderRadius: 2,
               padding: 2,
-              maxWidth: "80%",
+              maxWidth: hasImage ? "95%" : "80%",
               ml: isAssistant ? 0 : "auto",
               mr: isAssistant ? "auto" : 0,
             }}
           >
             {isAssistant ? (
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  p: ({ node, ...props }) => (
-                    <Typography
-                      variant="body2"
-                      sx={markdownStyles.p}
-                      {...props}
-                    />
-                  ),
-                  h3: ({ node, ...props }) => (
-                    <Typography
-                      variant="h6"
-                      sx={markdownStyles.h3}
-                      {...props}
-                    />
-                  ),
-                  h4: ({ node, ...props }) => (
-                    <Typography
-                      variant="subtitle1"
-                      sx={markdownStyles.h4}
-                      {...props}
-                    />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <Box component="ul" sx={markdownStyles.ul} {...props} />
-                  ),
-                  ol: ({ node, ...props }) => (
-                    <Box component="ol" sx={markdownStyles.ol} {...props} />
-                  ),
-                  li: ({ node, ...props }) => (
-                    <Box component="li" sx={markdownStyles.li} {...props} />
-                  ),
-                  a: ({ node, ...props }) => (
-                    <Box
-                      component="a"
-                      sx={markdownStyles.a}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      {...props}
-                    />
-                  ),
-                  code: ({ node, inline, ...props }) =>
-                    inline ? (
-                      <Box
-                        component="code"
-                        sx={markdownStyles.code}
+              <>
+                {/* Display markdown content */}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ node, ...props }) => (
+                      <Typography
+                        variant="body2"
+                        sx={markdownStyles.p}
                         {...props}
                       />
-                    ) : (
-                      <Box component="pre" sx={markdownStyles.pre} {...props} />
                     ),
-                  blockquote: ({ node, ...props }) => (
-                    <Box
-                      component="blockquote"
-                      sx={markdownStyles.blockquote}
-                      {...props}
-                    />
-                  ),
-                  strong: ({ node, ...props }) => (
-                    <Box
-                      component="strong"
-                      sx={markdownStyles.strong}
-                      {...props}
-                    />
-                  ),
-                  em: ({ node, ...props }) => (
-                    <Box component="em" sx={markdownStyles.em} {...props} />
-                  ),
-                }}
-              >
-                {message.content}
-              </ReactMarkdown>
+                    h3: ({ node, ...props }) => (
+                      <Typography
+                        variant="h6"
+                        sx={markdownStyles.h3}
+                        {...props}
+                      />
+                    ),
+                    h4: ({ node, ...props }) => (
+                      <Typography
+                        variant="subtitle1"
+                        sx={markdownStyles.h4}
+                        {...props}
+                      />
+                    ),
+                    ul: ({ node, ...props }) => (
+                      <Box component="ul" sx={markdownStyles.ul} {...props} />
+                    ),
+                    ol: ({ node, ...props }) => (
+                      <Box component="ol" sx={markdownStyles.ol} {...props} />
+                    ),
+                    li: ({ node, ...props }) => (
+                      <Box component="li" sx={markdownStyles.li} {...props} />
+                    ),
+                    a: ({ node, ...props }) => (
+                      <Box
+                        component="a"
+                        sx={markdownStyles.a}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...props}
+                      />
+                    ),
+                    code: ({ node, inline, ...props }) =>
+                      inline ? (
+                        <Box
+                          component="code"
+                          sx={markdownStyles.code}
+                          {...props}
+                        />
+                      ) : (
+                        <Box component="pre" sx={markdownStyles.pre} {...props} />
+                      ),
+                    blockquote: ({ node, ...props }) => (
+                      <Box
+                        component="blockquote"
+                        sx={markdownStyles.blockquote}
+                        {...props}
+                      />
+                    ),
+                    strong: ({ node, ...props }) => (
+                      <Box
+                        component="strong"
+                        sx={markdownStyles.strong}
+                        {...props}
+                      />
+                    ),
+                    em: ({ node, ...props }) => (
+                      <Box component="em" sx={markdownStyles.em} {...props} />
+                    ),
+                  }}
+                >
+                  {message.content}
+                </ReactMarkdown>
+                
+                {/* Display image if present */}
+                {hasImage && imageData && (
+                  <Box sx={{ mt: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
+                      {imageData.prompt ? `Generated image for: "${imageData.prompt}"` : 'Generated image'}
+                    </Typography>
+                    
+                    {/* Display either the thumbnail or load the image from the server */}
+                    {imageData.thumbnail ? (
+                      <Box 
+                        component="img"
+                        src={`data:${imageData.fileInfo.mime_type || 'image/png'};base64,${imageData.thumbnail}`}
+                        alt={imageData.prompt || "Generated image thumbnail"}
+                        sx={{
+                          maxWidth: '100%',
+                          maxHeight: '300px',
+                          objectFit: 'contain',
+                          borderRadius: 1,
+                          boxShadow: 2,
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => window.open(`/api/images/${imageData.fileInfo.file_name}`, '_blank')}
+                      />
+                    ) : (
+                      <Box 
+                        component="img"
+                        src={`/api/images/${imageData.fileInfo.file_name}`}
+                        alt={imageData.prompt || "Generated image"}
+                        sx={{
+                          maxWidth: '100%',
+                          maxHeight: '300px',
+                          objectFit: 'contain',
+                          borderRadius: 1,
+                          boxShadow: 2
+                        }}
+                      />
+                    )}
+                    
+                    {imageData.additionalText && (
+                      <Typography variant="body2" sx={{ mt: 1, fontStyle: 'italic' }}>
+                        {imageData.additionalText}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+                
+                {/* Feedback buttons for assistant messages */}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    mt: 1,
+                    opacity: 0.7,
+                    "&:hover": { opacity: 1 },
+                  }}
+                >
+                  <Tooltip title={feedbackState.feedback === true ? "Remove helpful feedback" : "Mark as helpful"}>
+                    <IconButton
+                      size="small"
+                      color={feedbackState.feedback === true ? "primary" : "default"}
+                      disabled={feedbackState.loading}
+                      onClick={() => handleFeedback(true)}
+                    >
+                      <ThumbUpIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title={feedbackState.feedback === false ? "Remove not helpful feedback" : "Mark as not helpful"}>
+                    <IconButton
+                      size="small"
+                      color={feedbackState.feedback === false ? "error" : "default"}
+                      disabled={feedbackState.loading}
+                      onClick={() => handleFeedback(false)}
+                    >
+                      <ThumbDownIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </>
             ) : (
               <Typography variant="body2">{message.content}</Typography>
             )}
@@ -235,7 +426,9 @@ const ChatMessage = ({ message }) => {
               mt: 0.5,
             }}
           >
-            {new Date(message.created_at).toLocaleTimeString()}
+            {typeof message.created_at === 'number' 
+              ? new Date(message.created_at * 1000).toLocaleTimeString()
+              : new Date(message.created_at).toLocaleTimeString()}
           </Typography>
         }
         disableTypography

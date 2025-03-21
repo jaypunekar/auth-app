@@ -241,6 +241,16 @@ export const chatAPI = {
   getChatSessions: () => api.get('/chat/sessions'),
 };
 
+// Feedback API
+export const feedbackAPI = {
+  submitFeedback: (messageId, isPositive) => 
+    api.post('/feedback', { message_id: messageId, is_positive: isPositive }),
+  getLikedMessages: () => api.get('/feedback/liked'),
+  getDislikedMessages: () => api.get('/feedback/disliked'),
+  getAllFeedback: () => api.get('/feedback/all'),
+  deleteFeedback: (feedbackId) => api.delete(`/feedback/${feedbackId}`),
+};
+
 // Ad Campaign API
 export const adCampaignAPI = {
   createCampaign: (campaign) => api.post('/ads', campaign),
@@ -274,168 +284,166 @@ export const adCampaignAPI = {
   generateImage: (id) => api.post(`/ads/${id}/generate-image`),
 };
 
-// Calendar API
-export const calendarAPI = {
-  createEntry: (entry) => api.post('/calendar', entry),
-  getEntries: async () => {
+// Google Ads API
+export const googleAdsAPI = {
+  getAccountStatus: async () => {
     try {
-      // Get token from localStorage
-      const token = localStorage.getItem('token');
-      
-      // Log token status for debugging
-      console.log('Calendar API - Token check:', {
-        hasToken: !!token,
-        tokenLength: token ? token.length : 0,
-        tokenPreview: token ? `${token.substring(0, 10)}...${token.substring(token.length - 10)}` : 'No token'
-      });
-
-      if (!token) {
-        console.error('No token found for calendar API call');
-        throw new Error('No valid token');
-      }
-
-      // Make the request using the axios instance which already handles auth headers
-      const response = await api.get('/calendar');
-      
-      if (!response || !response.data) {
-        throw new Error('Invalid response from calendar API');
-      }
-      
-      // Transform the response data
-      const transformedData = await Promise.all(response.data.map(async entry => {
-        let campaignDetails = {
-          title: entry.ad_campaign_title || 'Unknown Campaign',
-          platform: entry.ad_campaign_platform || 'Unknown Platform',
-          budget: '10.00',
-          budget_type: 'Daily'
-        };
-
-        // Fetch campaign details if available
-        if (entry.ad_campaign_id) {
-          try {
-            const campaignResponse = await adCampaignAPI.getCampaign(entry.ad_campaign_id);
-            if (campaignResponse.data) {
-              campaignDetails = {
-                ...campaignDetails,
-                ...campaignResponse.data
-              };
-            }
-          } catch (err) {
-            console.error(`Error fetching campaign details for ID ${entry.ad_campaign_id}:`, err);
-          }
-        }
-
-        // Parse ad copy
-        const parsedAdCopy = parseAdCopy(entry.ad_copy, campaignDetails.platform_data);
-
-        return {
-          ...entry,
-          ...parsedAdCopy,
-          campaign: campaignDetails
-        };
-      }));
-
-      return { ...response, data: transformedData };
+      console.log('Fetching Google Ads account status...');
+      const response = await api.get('/google-ads/account-status');
+      console.log('Google Ads account status response:', response.data);
+      return response;
     } catch (error) {
-      console.error('Calendar API Error:', error);
-      if (error.response?.status === 401) {
-        // Don't throw here, let the component handle the 401
-        return { data: [], error: 'Unauthorized' };
+      console.error('Error getting Google Ads account status:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
       }
       throw error;
     }
   },
-  getEntriesByCampaign: (campaignId) => api.get(`/calendar/campaign/${campaignId}`),
-  getEntry: (id) => api.get(`/calendar/${id}`),
-  updateEntry: (id, entry) => api.put(`/calendar/${id}`, entry),
-  deleteEntry: (id) => api.delete(`/calendar/${id}`),
-  generateCalendar: (request) => api.post('/calendar/generate', request),
-};
-
-const parseAdCopy = (adCopy, platformData = null) => {
-  const parsedData = {
-    part: '',
-    phase: '',
-    title: '',
-    headline: '',
-    description: '',
-    cta: '',
-    date_range: ''
-  };
-
-  // First check platform_data
-  if (platformData) {
+  
+  linkAccount: async (data) => {
     try {
-      const data = typeof platformData === 'string' ? JSON.parse(platformData) : platformData;
-      if (data.headlines?.length > 0) parsedData.headline = data.headlines[0];
-      if (data.unique_title) parsedData.title = data.unique_title;
-      if (data.descriptions?.length > 0) parsedData.description = data.descriptions[0];
-      if (data.phase) parsedData.phase = data.phase.toUpperCase();
-    } catch (err) {
-      console.error('Error parsing platform_data:', err);
-    }
-  }
-
-  // Then parse ad_copy
-  if (adCopy) {
-    try {
-      if (adCopy.startsWith('{')) {
-        const data = JSON.parse(adCopy);
-        parsedData.headline = data.headline || parsedData.headline;
-        parsedData.description = data.description || parsedData.description;
-        parsedData.cta = data.cta || parsedData.cta;
-        parsedData.title = data.title || parsedData.title;
-        parsedData.part = data.part ? `Part ${data.part}` : parsedData.part;
-        parsedData.phase = data.phase || parsedData.phase;
-        parsedData.date_range = data.date_range || parsedData.date_range;
-      } else {
-        // Parse using regex
-        const matches = {
-          title: adCopy.match(/Title:\s*(.*?)(\n|$)/s),
-          headline: adCopy.match(/Headline:\s*(.*?)(\n|$)/s),
-          description: adCopy.match(/Description:\s*(.*?)(\n|$)/s),
-          cta: adCopy.match(/CTA:\s*(.*?)(\n|$)/s),
-          part: adCopy.match(/Part\s+\d+:\s*(.*?)(\n|$)/s),
-          duration: adCopy.match(/Duration:\s*(.*?)(\n|$)/s)
-        };
-
-        if (matches.title) parsedData.title = matches.title[1].trim();
-        if (matches.headline) parsedData.headline = matches.headline[1].trim();
-        if (matches.description) parsedData.description = matches.description[1].trim();
-        if (matches.cta) parsedData.cta = matches.cta[1].trim();
-        if (matches.part) {
-          parsedData.part = matches.part[0].trim();
-          if (matches.part[1]) parsedData.phase = matches.part[1].trim();
-        }
-        if (matches.duration) parsedData.date_range = matches.duration[1].trim();
+      console.log('Linking Google Ads account with data:', data);
+      const response = await api.post('/google-ads/link-account', data);
+      console.log('Google Ads account linking response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error linking Google Ads account:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
       }
-    } catch (err) {
-      console.error('Error parsing ad_copy:', err);
+      throw error;
+    }
+  },
+  
+  createCampaign: async (campaignData) => {
+    try {
+      console.log('Creating Google Ads campaign with data:', campaignData);
+      const response = await api.post('/google-ads/create-campaign', campaignData);
+      console.log('Google Ads campaign creation response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error creating Google Ads campaign:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  getCampaigns: async () => {
+    try {
+      console.log('Fetching Google Ads campaigns...');
+      const response = await api.get('/google-ads/campaigns');
+      console.log('Google Ads campaigns response:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error getting Google Ads campaigns:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  updateCampaign: async (campaignId, campaignData) => {
+    try {
+      console.log(`Updating Google Ads campaign ${campaignId} with data:`, campaignData);
+      const response = await api.put(`/google-ads/campaigns/${campaignId}`, campaignData);
+      console.log('Google Ads campaign update response:', response.data);
+      return response;
+    } catch (error) {
+      console.error(`Error updating Google Ads campaign ${campaignId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  deleteCampaign: async (campaignId) => {
+    try {
+      console.log(`Deleting Google Ads campaign ${campaignId}`);
+      const response = await api.delete(`/google-ads/campaigns/${campaignId}`);
+      console.log('Google Ads campaign delete response:', response.data);
+      return response;
+    } catch (error) {
+      console.error(`Error deleting Google Ads campaign ${campaignId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  getResponsiveSearchAds: async (campaignId, adGroupId = null) => {
+    try {
+      console.log(`Fetching responsive search ads for campaign ${campaignId}...`);
+      const url = adGroupId 
+        ? `/google-ads/responsive-search-ads?campaign_id=${campaignId}&ad_group_id=${adGroupId}`
+        : `/google-ads/responsive-search-ads?campaign_id=${campaignId}`;
+      
+      const response = await api.get(url);
+      console.log('Responsive search ads response:', response.data);
+      return response;
+    } catch (error) {
+      console.error(`Error getting responsive search ads for campaign ${campaignId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  updateResponsiveSearchAd: async (adId, adData) => {
+    try {
+      console.log(`Updating responsive search ad ${adId} with data:`, adData);
+      const response = await api.put(`/google-ads/responsive-search-ad`, {
+        ad_id: adId,
+        ...adData
+      });
+      console.log('Responsive search ad update response:', response.data);
+      return response;
+    } catch (error) {
+      console.error(`Error updating responsive search ad ${adId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
     }
   }
-
-  // Set phase based on part number if not already set
-  if (!parsedData.phase && parsedData.part) {
-    if (parsedData.part.includes('Part 1')) parsedData.phase = 'AWARENESS';
-    else if (parsedData.part.includes('Part 2')) parsedData.phase = 'CONSIDERATION';
-    else if (parsedData.part.includes('Part 3')) parsedData.phase = 'CONVERSION';
-  }
-
-  // Use headline as title if title is missing
-  if (!parsedData.title && parsedData.headline) {
-    parsedData.title = parsedData.headline;
-  }
-
-  return parsedData;
 };
 
-// Google Ads API
-export const googleAdsAPI = {
-  linkAccount: (data) => api.post('/google-ads/link-account', data),
-  getAccountStatus: () => api.get('/google-ads/account-status'),
-  createCampaign: (data) => api.post('/google-ads/create-campaign', data),
-  getCampaigns: () => api.get('/google-ads/campaigns'),
-  updateCampaign: (campaignId, data) => api.put(`/google-ads/campaigns/${campaignId}`, data),
+// Add a new API service for image generation
+export const imageAPI = {
+  generateImage: (prompt) => {
+    return axios.post('/api/images/generate', { prompt }, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+  },
+  
+  getImages: () => {
+    return axios.get('/api/images/list', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+  }
+};
+
+// Export all API services - don't export imageAPI here, as it's already exported above
+export {
+  // ... existing exports
 };
 
 export default api; 
