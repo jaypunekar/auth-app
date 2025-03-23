@@ -33,10 +33,18 @@ const ImageGenerator = () => {
     try {
       setError(null);
       const response = await imageAPI.getImages();
-      setGeneratedImages(response.data);
+      // Ensure we always set an array, even if the API returns something else
+      if (Array.isArray(response.data)) {
+        setGeneratedImages(response.data);
+      } else {
+        console.error('API returned non-array data:', response.data);
+        setGeneratedImages([]);
+        setError('Invalid data format received from server.');
+      }
     } catch (err) {
       console.error('Error fetching images:', err);
       setError('Failed to load images. Please try again.');
+      setGeneratedImages([]);
     }
   };
 
