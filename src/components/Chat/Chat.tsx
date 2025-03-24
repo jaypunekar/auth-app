@@ -165,16 +165,20 @@ You can now monitor your campaign performance in your Google Ads account. Is the
         setImageGenerationRequested(false);
         enqueueSnackbar('Image generated successfully!', { variant: 'success' });
         
+        // Create the message content based on whether we have Google Drive info
+        let content = `I've generated an image for your campaign. You can use this in your ads.\n\n![Generated Ad Image](${response.data.image_url})\n\n${response.data.message}\n\n`;
+        
+        // Add Google Drive link if available
+        if (response.data.google_drive_url) {
+          content += `You can access this image directly in Google Drive: [View in Google Drive](${response.data.google_drive_url})\n\n`;
+        }
+        
+        content += `Would you like me to generate another image with different parameters?`;
+        
         // Add a message about the image
         setMessages(prev => [...prev, { 
           role: 'assistant', 
-          content: `I've generated an image for your campaign. You can use this in your ads.
-
-![Generated Ad Image](${response.data.image_url})
-
-${response.data.message}
-
-Would you like me to generate another image with different parameters?`
+          content: content
         }]);
       }
     } catch (error) {

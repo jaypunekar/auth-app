@@ -11,6 +11,9 @@ import AuthLayout from './components/layouts/AuthLayout';
 // Pages
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import VerifyEmail from './pages/auth/VerifyEmail';
+import ResetPassword from './pages/auth/ResetPassword';
+import VerificationPage from './pages/auth/VerificationPage';
 import Dashboard from './pages/Dashboard';
 import ChatPage from './pages/ChatPage';
 import AdCampaignForm from './pages/AdCampaignForm';
@@ -46,6 +49,11 @@ function App() {
           <Route path="login" element={<Login />} />
           <Route path="register" element={<Register />} />
         </Route>
+        
+        {/* Auth Pages without Layout */}
+        <Route path="verify-email" element={<VerifyEmail />} />
+        <Route path="reset-password" element={<ResetPassword />} />
+        <Route path="verify" element={<VerificationPage />} />
 
         {/* Protected Routes */}
         <Route path="/" element={

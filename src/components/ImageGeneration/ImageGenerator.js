@@ -13,8 +13,9 @@ import {
   Alert,
   Paper,
   Divider,
+  Link,
 } from '@mui/material';
-import { ImageSearch as ImageIcon } from '@mui/icons-material';
+import { ImageSearch as ImageIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
 import { imageAPI } from '../../services/api';
 
 const ImageGenerator = () => {
@@ -87,6 +88,10 @@ const ImageGenerator = () => {
     setSelectedImage(null);
   };
 
+  const openImageInNewTab = (url) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" gutterBottom>
@@ -132,7 +137,7 @@ const ImageGenerator = () => {
       <Divider sx={{ mb: 4 }} />
 
       <Typography variant="h6" gutterBottom>
-        Generated Images
+        Your Generated Images
       </Typography>
 
       {generatedImages.length === 0 ? (
@@ -147,7 +152,7 @@ const ImageGenerator = () => {
                 <CardMedia
                   component="img"
                   height="200"
-                  image={image.url}
+                  image={image.thumbnail_url || image.url}
                   alt={image.prompt}
                   sx={{ 
                     objectFit: 'contain',
@@ -157,10 +162,22 @@ const ImageGenerator = () => {
                   onClick={() => handleImageClick(image)}
                 />
                 <CardContent sx={{ py: 1 }}>
-                  <Typography variant="body2" color="text.secondary" noWrap>
+                  <Typography variant="body2" color="text.secondary" noWrap title={image.prompt}>
+                    {image.prompt}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
                     {new Date(image.created_at).toLocaleString()}
                   </Typography>
                 </CardContent>
+                <CardActions>
+                  <Button 
+                    size="small" 
+                    startIcon={<OpenInNewIcon />}
+                    onClick={() => openImageInNewTab(image.url)}
+                  >
+                    Open
+                  </Button>
+                </CardActions>
               </Card>
             </Grid>
           ))}
@@ -208,12 +225,24 @@ const ImageGenerator = () => {
               }}
             />
             <Paper sx={{ p: 2, mt: 1, width: '100%', maxWidth: '600px' }}>
-              <Typography variant="body2">
-                <strong>Created:</strong> {new Date(selectedImage.created_at).toLocaleString()}
-              </Typography>
-              <Typography variant="body2">
+              <Typography variant="body2" gutterBottom>
                 <strong>Prompt:</strong> {selectedImage.prompt}
               </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Created:</strong> {new Date(selectedImage.created_at).toLocaleString()}
+              </Typography>
+              <Button 
+                variant="outlined" 
+                size="small" 
+                startIcon={<OpenInNewIcon />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openImageInNewTab(selectedImage.url);
+                }}
+                sx={{ mt: 1 }}
+              >
+                Open in New Tab
+              </Button>
             </Paper>
           </Box>
         </Box>

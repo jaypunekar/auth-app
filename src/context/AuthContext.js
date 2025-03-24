@@ -335,6 +335,35 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
   };
 
+  // Direct auth data setting function
+  const setAuthData = (data) => {
+    console.log('Setting auth data directly:', data);
+    
+    if (data.token) {
+      // Save token using the utility function
+      storeToken(data.token);
+      
+      // Set default auth header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+    }
+    
+    if (data.user) {
+      setUser(data.user);
+      
+      // Store user info if available
+      if (data.user.id) {
+        localStorage.setItem('user_id', data.user.id);
+      }
+      if (data.user.email) {
+        localStorage.setItem('user_email', data.user.email);
+      }
+    }
+    
+    if (data.isAuthenticated !== undefined) {
+      setIsAuthenticated(data.isAuthenticated);
+    }
+  };
+
   // Context value
   const value = {
     user,
@@ -344,7 +373,8 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     googleLogin,
-    logout
+    logout,
+    setAuthData
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
