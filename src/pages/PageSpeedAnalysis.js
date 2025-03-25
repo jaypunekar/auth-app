@@ -35,7 +35,6 @@ import {
   Lightbulb as LightbulbIcon,
   HelpOutline as HelpIcon
 } from '@mui/icons-material';
-import axios from 'axios';
 import { 
   BarChart, 
   Bar, 
@@ -51,6 +50,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import api from '../services/api';
 
 const PageSpeedAnalysis = () => {
   const [url, setUrl] = useState('');
@@ -91,7 +91,7 @@ const PageSpeedAnalysis = () => {
     const step3Timeout = setTimeout(() => setAnalysisStep(3), 4000);
     
     try {
-      const response = await axios.get(`/api/pagespeed/analyze?url=${encodeURIComponent(formattedUrl)}`);
+      const response = await api.get(`/pagespeed/analyze?url=${encodeURIComponent(formattedUrl)}`);
       
       // Validate response data
       if (!response.data) {
