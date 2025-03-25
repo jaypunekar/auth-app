@@ -126,11 +126,49 @@ const ChatMessage = ({ message }) => {
   // Check if the message contains an image
   const [hasImage, setHasImage] = useState(false);
   const [imageData, setImageData] = useState(null);
+  const [driveImageUrl, setDriveImageUrl] = useState(null);
   
-  // Parse message for image data
+  // Parse message for image data and Google Drive URLs
   useEffect(() => {
     if (isAssistant && message.content) {
       try {
+        // Extract prompt text from message if possible
+        let promptText = '';
+        const promptMatch = message.content.match(/prompt: ["']([^"']+)["']/i) || 
+                          message.content.match(/generated image for: ["']([^"']+)["']/i) ||
+                          message.content.match(/image of ["']([^"']+)["']/i);
+        
+        if (promptMatch && promptMatch[1]) {
+          promptText = promptMatch[1];
+        }
+
+        // Check for Google Drive URL in the message using multiple patterns
+        const driveUrlPatterns = [
+          /available at: (https:\/\/drive\.google\.com\/[^\s]+)/i,
+          /\[View in Google Drive\]\((https:\/\/drive\.google\.com\/[^\s\)]+)\)/i,
+          /Google Drive: (https:\/\/drive\.google\.com\/[^\s]+)/i,
+          /(https:\/\/drive\.google\.com\/file\/d\/[-\w]{25,}[^\s]*)/i,
+          /(https:\/\/drive\.google\.com\/open\?id=[-\w]{25,}[^\s]*)/i
+        ];
+        
+        let driveUrl = null;
+        for (const pattern of driveUrlPatterns) {
+          const match = message.content.match(pattern);
+          if (match && match[1]) {
+            driveUrl = match[1];
+            break;
+          }
+        }
+        
+        if (driveUrl) {
+          console.log("Found Google Drive URL:", driveUrl);
+          setDriveImageUrl({
+            url: driveUrl,
+            prompt: promptText
+          });
+        }
+        
+        // Original image data extraction logic
         // Try to parse potential JSON content
         if (message.content.includes('"display_type":"image"') || 
             message.content.includes('"file_info"')) {
@@ -332,6 +370,108 @@ const ChatMessage = ({ message }) => {
                 >
                   {message.content}
                 </ReactMarkdown>
+                
+                {/* Display Google Drive image preview if available */}
+                {driveImageUrl && (
+                  <Box sx={{ mt: 2, textAlign: 'center' }}>
+                    <Typography variant="caption" sx={{ display: 'block', mb: 1, fontStyle: 'italic' }}>
+                      {driveImageUrl.prompt 
+                        ? `Generated image for: "${driveImageUrl.prompt}"`
+                        : 'Generated image - Click to view in Google Drive'}
+                    </Typography>
+                    
+                    <Box 
+                      component="a"
+                      href={driveImageUrl.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ 
+                        display: 'block',
+                        position: 'relative',
+                        maxWidth: '90%',
+                        margin: '0 auto',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      {/* Thumbnail image with extracted Google Drive ID */}
+                      <Box
+                        component="img" 
+                        src={(() => {
+                          // Extract file ID from Google Drive URL
+                          try {
+                            // Handle different Google Drive URL formats
+                            let fileId = null;
+                            
+                            // Format: https://drive.google.com/file/d/FILE_ID/view
+                            const fileMatch = driveImageUrl.url.match(/\/file\/d\/([-\w]{25,})/);
+                            if (fileMatch && fileMatch[1]) {
+                              fileId = fileMatch[1];
+                            }
+                            
+                            // Format: https://drive.google.com/open?id=FILE_ID
+                            const idMatch = driveImageUrl.url.match(/[?&]id=([-\w]{25,})/);
+                            if (!fileId && idMatch && idMatch[1]) {
+                              fileId = idMatch[1];
+                            }
+                            
+                            // Generic match for any 25+ character alphanumeric ID
+                            if (!fileId) {
+                              const genericMatch = driveImageUrl.url.match(/[-\w]{25,}/);
+                              if (genericMatch && genericMatch[0]) {
+                                fileId = genericMatch[0];
+                              }
+                            }
+                            
+                            if (fileId) {
+                              return `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
+                            }
+                            
+                            // If we can't extract the ID, return a placeholder
+                            return '/static/images/image-placeholder.svg';
+                          } catch (e) {
+                            console.error("Error extracting file ID:", e);
+                            return '/static/images/image-placeholder.svg';
+                          }
+                        })()}
+                        alt="Generated image preview"
+                        sx={{
+                          width: '100%',
+                          maxHeight: '250px',
+                          objectFit: 'contain',
+                          border: '1px solid #ddd',
+                          borderRadius: 1,
+                          boxShadow: 2,
+                          transition: 'transform 0.2s',
+                          '&:hover': {
+                            transform: 'scale(1.02)',
+                          }
+                        }}
+                        onError={(e) => {
+                          // If thumbnail fails to load, show a placeholder
+                          e.target.src = '/static/images/image-placeholder.svg';
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          backgroundColor: 'rgba(0,0,0,0.6)',
+                          color: 'white',
+                          padding: '8px',
+                          textAlign: 'center',
+                          fontSize: '0.85rem',
+                          borderBottomLeftRadius: 1,
+                          borderBottomRightRadius: 1,
+                        }}
+                      >
+                        View in Google Drive
+                      </Box>
+                    </Box>
+                  </Box>
+                )}
                 
                 {/* Display image if present */}
                 {hasImage && imageData && (
