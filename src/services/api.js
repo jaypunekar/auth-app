@@ -425,19 +425,11 @@ export const googleAdsAPI = {
 // Add a new API service for image generation
 export const imageAPI = {
   generateImage: (prompt) => {
-    return axios.post('/api/images/generate', { prompt }, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    return api.post('/images/generate', { prompt });
   },
   
   getImages: () => {
-    return axios.get('/api/images/list', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    return api.get('/images/list');
   }
 };
 
