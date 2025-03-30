@@ -35,6 +35,42 @@ const googleAdsApi = {
     }
   },
 
+  // Link an existing Google Ads account using the new endpoint
+  linkExistingAccount: async (customerId) => {
+    try {
+      console.log(`Linking existing Google Ads account: ${customerId}`);
+      const response = await api.post('/google-ads/link-existing-account', { 
+        customer_id: customerId 
+      });
+      console.log('Link existing account response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error linking existing account:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Check the link status
+  checkLinkStatus: async (customerId) => {
+    try {
+      console.log(`Checking link status for account: ${customerId}`);
+      const response = await api.get(`/google-ads/check-link-status/${customerId}`);
+      console.log('Check link status response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking link status:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
   // Create a Google Ads campaign
   createCampaign: async (campaignData) => {
     try {
@@ -86,6 +122,23 @@ const googleAdsApi = {
     }
   },
 
+  // Test update a Google Ads campaign
+  testUpdateCampaign: async (campaignId, campaignData) => {
+    try {
+      console.log(`Test updating Google Ads campaign ${campaignId} with data:`, campaignData);
+      const response = await api.post(`/google-ads/test-update-campaign/${campaignId}`, campaignData);
+      console.log('Test update response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error test updating Google Ads campaign ${campaignId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
   // Get responsive search ads for a campaign
   getResponsiveSearchAds: async (campaignId, adGroupId = null) => {
     try {
@@ -119,6 +172,74 @@ const googleAdsApi = {
       return response.data;
     } catch (error) {
       console.error(`Error updating responsive search ad ${adId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Add funds to a Google Ads account
+  addFunds: async (amount) => {
+    try {
+      console.log(`Adding ${amount} to Google Ads account`);
+      const response = await api.post('/google-ads/add-funds', { amount });
+      console.log('Add funds response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error adding funds to Google Ads account:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Create a Stripe checkout session for adding funds
+  createFundsCheckout: async (amount) => {
+    try {
+      console.log(`Creating checkout session for ${amount} Google Ads funds`);
+      const response = await api.post('/google-ads/create-funds-checkout', { amount });
+      console.log('Checkout session response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating checkout session for funds:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Get the funds balance for the Google Ads account
+  getFunds: async () => {
+    try {
+      console.log('Fetching Google Ads account funds...');
+      const response = await api.get('/google-ads/funds');
+      console.log('Google Ads funds response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting Google Ads account funds:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Unlink a Google Ads account (only available for linked accounts, not created accounts)
+  unlinkAccount: async () => {
+    try {
+      console.log('Unlinking Google Ads account');
+      const response = await api.post('/google-ads/unlink-account');
+      console.log('Unlink account response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error unlinking Google Ads account:', error);
       if (error.response) {
         console.error('Error status:', error.response.status);
         console.error('Error data:', error.response.data);

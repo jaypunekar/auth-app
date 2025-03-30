@@ -20,6 +20,10 @@ import AdCampaignForm from './pages/AdCampaignForm';
 import AdCampaignDetail from './pages/AdCampaignDetail';
 import PageSpeedAnalysis from './pages/PageSpeedAnalysis';
 import AdCalendar from './pages/AdCalendar';
+import InstagramAnalyzer from './pages/InstagramAnalyzer';
+import FacebookAnalyzer from './pages/FacebookAnalyzer';
+import Subscriptions from './pages/Subscriptions';
+import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -68,6 +72,10 @@ function App() {
           <Route path="campaigns/:id" element={<AdCampaignDetail />} />
           <Route path="pagespeed" element={<PageSpeedAnalysis />} />
           <Route path="adcalendar" element={<AdCalendar />} />
+          <Route path="instagram-analyzer" element={<InstagramAnalyzer />} />
+          <Route path="facebook-analyzer" element={<FacebookAnalyzer />} />
+          <Route path="subscriptions" element={<Subscriptions />} />
+          <Route path="google-ads-funds-success" element={<GoogleAdsFundsSuccess />} />
         </Route>
 
         {/* Redirect to login for any other route */}

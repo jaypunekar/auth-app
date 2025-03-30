@@ -405,10 +405,35 @@ export const googleAdsAPI = {
   updateResponsiveSearchAd: async (adId, adData) => {
     try {
       console.log(`Updating responsive search ad ${adId} with data:`, adData);
-      const response = await api.put(`/google-ads/responsive-search-ad`, {
+      
+      // Ensure headlines and descriptions are properly formatted
+      const headlines = adData.headlines.map(h => ({
+        text: h.text || "",
+        pinnedField: h.pinnedField || null
+      })).filter(h => h.text && h.text.trim() !== "");
+      
+      const descriptions = adData.descriptions.map(d => ({
+        text: d.text || "",
+        pinnedField: d.pinnedField || null
+      })).filter(d => d.text && d.text.trim() !== "");
+      
+      // Ensure finalUrl is properly formatted
+      let finalUrl = adData.finalUrl || "";
+      if (finalUrl && !finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+        finalUrl = "https://" + finalUrl;
+      }
+      
+      // Format the data according to the backend's ResponsiveSearchAdUpdate model
+      const requestData = {
         ad_id: adId,
-        ...adData
-      });
+        headlines: headlines,
+        descriptions: descriptions,
+        finalUrl: finalUrl
+      };
+      
+      console.log('Sending formatted request data:', JSON.stringify(requestData, null, 2));
+      
+      const response = await api.put(`/google-ads/responsive-search-ad`, requestData);
       console.log('Responsive search ad update response:', response.data);
       return response;
     } catch (error) {
@@ -416,6 +441,43 @@ export const googleAdsAPI = {
       if (error.response) {
         console.error('Error status:', error.response.status);
         console.error('Error data:', error.response.data);
+        console.error('Error headers:', error.response.headers);
+        console.error('Request that caused the error:', error.config);
+      }
+      throw error;
+    }
+  },
+  
+  updateAdSimple: async (adId, adData) => {
+    try {
+      console.log(`Using simplified update for ad ${adId} with data:`, adData);
+      
+      // Format the data for the simplified endpoint
+      const requestData = {
+        adId: adId,
+        headlines: adData.headlines.map(h => ({
+          text: h.text || "",
+          pinnedField: h.pinnedField || null
+        })).filter(h => h.text && h.text.trim() !== ""),
+        descriptions: adData.descriptions.map(d => ({
+          text: d.text || "",
+          pinnedField: d.pinnedField || null
+        })).filter(d => d.text && d.text.trim() !== ""),
+        finalUrl: adData.finalUrl || ""
+      };
+      
+      console.log('Sending simplified request data:', JSON.stringify(requestData, null, 2));
+      
+      const response = await api.post(`/google-ads/update-ad-simple`, requestData);
+      console.log('Simplified ad update response:', response.data);
+      return response;
+    } catch (error) {
+      console.error(`Error with simplified ad update for ${adId}:`, error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+        console.error('Error headers:', error.response.headers);
+        console.error('Request that caused the error:', error.config);
       }
       throw error;
     }

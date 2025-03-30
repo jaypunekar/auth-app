@@ -11,6 +11,30 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [subscription, setSubscription] = useState({
+    tier: 'Free',
+    features: {
+      can_use_google_ads: false,
+      max_campaigns: 5,
+      premium_ai: false
+    }
+  });
+
+  // Check user subscription
+  const checkSubscription = async () => {
+    try {
+      if (!isAuthenticated) return;
+      
+      console.log('Checking subscription status...');
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/subscription/current`);
+      console.log('Subscription data received:', response.data);
+      setSubscription(response.data);
+      return response.data;
+    } catch (err) {
+      console.error('Error fetching subscription info:', err);
+      return null;
+    }
+  };
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -35,6 +59,9 @@ export const AuthProvider = ({ children }) => {
             console.log('User info retrieved successfully:', response.data);
             setUser(response.data);
             setIsAuthenticated(true);
+            
+            // Immediately check subscription after confirming authentication
+            await checkSubscription();
           } catch (userErr) {
             console.error('Failed to get user info:', userErr);
             
@@ -89,6 +116,13 @@ export const AuthProvider = ({ children }) => {
     
     checkAuth();
   }, []);
+
+  // Add effect to check subscription whenever isAuthenticated changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      checkSubscription();
+    }
+  }, [isAuthenticated]);
 
   // Login function
   const login = async (email, password) => {
@@ -156,6 +190,9 @@ export const AuthProvider = ({ children }) => {
         console.log('User info retrieved successfully');
         setUser(userResponse.data);
         setIsAuthenticated(true);
+        
+        // Check subscription immediately after login
+        await checkSubscription();
         
         // Log auth debug info
         console.log('Auth state after login:', debugAuth());
@@ -364,17 +401,38 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Update subscription tier
+  const updateSubscription = async (tier) => {
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || '/api'}/subscription/update`,
+        { tier }
+      );
+      setSubscription(response.data);
+      return true;
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update subscription');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Context value
   const value = {
     user,
     isAuthenticated,
     loading,
     error,
+    subscription,
     login,
     register,
     googleLogin,
     logout,
-    setAuthData
+    setAuthData,
+    updateSubscription,
+    checkSubscription
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

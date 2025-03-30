@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -50,6 +50,7 @@ import {
   Pie,
   Cell
 } from 'recharts';
+import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 
 const PageSpeedAnalysis = () => {
@@ -60,6 +61,19 @@ const PageSpeedAnalysis = () => {
   const [analysisStep, setAnalysisStep] = useState(0);
   const [error, setError] = useState(null);
   const theme = useTheme();
+  const location = useLocation();
+
+  // Parse URL parameter when component mounts
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const urlParam = queryParams.get('url');
+    
+    if (urlParam) {
+      setUrl(urlParam);
+      // Auto-analyze the URL if it's provided in the query parameters
+      handleAnalyzeUrl(urlParam);
+    }
+  }, [location.search]);
 
   const handleUrlChange = (e) => {
     setUrl(e.target.value);
@@ -69,8 +83,9 @@ const PageSpeedAnalysis = () => {
     setActiveTab(newValue);
   };
 
-  const handleAnalyze = async () => {
-    if (!url) return;
+  // Function to analyze a specific URL (used for auto-analysis)
+  const handleAnalyzeUrl = async (urlToAnalyze) => {
+    if (!urlToAnalyze) return;
 
     // Reset states
     setLoading(true);
@@ -78,9 +93,9 @@ const PageSpeedAnalysis = () => {
     setError(null);
     
     // Add http:// if not present
-    let formattedUrl = url;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      formattedUrl = 'https://' + url;
+    let formattedUrl = urlToAnalyze;
+    if (!urlToAnalyze.startsWith('http://') && !urlToAnalyze.startsWith('https://')) {
+      formattedUrl = 'https://' + urlToAnalyze;
     }
     
     // Simulate the analysis steps
@@ -136,6 +151,11 @@ const PageSpeedAnalysis = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Regular analyze function for button click
+  const handleAnalyze = () => {
+    handleAnalyzeUrl(url);
   };
 
   const getScoreColor = (score) => {

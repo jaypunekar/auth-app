@@ -46,7 +46,9 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   const [success, setSuccess] = useState(null);
   const [accountStatus, setAccountStatus] = useState({
     isLinked: false,
-    customerId: ''
+    customerId: '',
+    connectionType: '',
+    availableFunds: 0
   });
 
   // Form data
@@ -105,7 +107,9 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         if (response && response.data) {
           setAccountStatus({
             isLinked: response.data.is_linked || false,
-            customerId: response.data.customer_id || ''
+            customerId: response.data.customer_id || '',
+            connectionType: response.data.connection_type || '',
+            availableFunds: response.data.available_funds || 0
           });
         }
       } catch (error) {
@@ -250,6 +254,23 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         setError('You need to link your Google Ads account first. Please use the "Link Google Ads" button in the top bar.');
         setLoading(false);
         return;
+      }
+      
+      // Check if the account is created under our management and has sufficient funds
+      const dailyBudget = parseFloat(formData.daily_budget);
+      if (accountStatus.connectionType === 'created') {
+        // Calculate the minimum funds required (30 days of daily budget)
+        const minimumFundsRequired = dailyBudget * 30;
+        
+        if (accountStatus.availableFunds < minimumFundsRequired) {
+          setError(
+            `Insufficient funds. Your campaign requires at least $${minimumFundsRequired.toFixed(2)} ` +
+            `(30 days of daily budget), but you only have $${accountStatus.availableFunds.toFixed(2)} available. ` +
+            `Please add more funds before creating this campaign.`
+          );
+          setLoading(false);
+          return;
+        }
       }
       
       // Add customer ID to the data
@@ -726,6 +747,10 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
             <Alert severity="warning" sx={{ mb: 2 }}>
               You need to link your Google Ads account before creating campaigns. Please use the "Link Google Ads" button in the top bar.
             </Alert>
+          ) : accountStatus.connectionType === 'created' && accountStatus.availableFunds <= 0 ? (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              Your Google Ads account has no funds available. Please add funds before creating campaigns.
+            </Alert>
           ) : (
             <>
               {error && (
@@ -737,6 +762,12 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
               {success && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   {success}
+                </Alert>
+              )}
+              
+              {accountStatus.connectionType === 'created' && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Available funds: ${accountStatus.availableFunds.toFixed(2)}
                 </Alert>
               )}
               

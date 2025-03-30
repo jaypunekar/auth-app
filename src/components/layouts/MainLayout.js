@@ -18,6 +18,9 @@ import {
   Avatar,
   Menu,
   MenuItem,
+  Tooltip,
+  Badge,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -28,6 +31,12 @@ import {
   Logout as LogoutIcon,
   Speed as SpeedIcon,
   CalendarMonth as CalendarIcon,
+  Instagram as InstagramIcon,
+  Facebook as FacebookIcon,
+  Subscriptions as SubscriptionsIcon,
+  Lock as LockIcon,
+  ContactSupport as ContactSupportIcon,
+  StarBorder as StarBorderIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -36,7 +45,7 @@ import GoogleAdsCreationButton from '../GoogleAdsCreationButton';
 const drawerWidth = 240;
 
 const MainLayout = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, subscription } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -58,11 +67,21 @@ const MainLayout = () => {
     navigate('/login');
   };
 
+  // Check if user can use Google Ads
+  const canUseGoogleAds = subscription?.features?.can_use_google_ads || false;
+  
+  // Show upgrade button based on current tier
+  const showUpgradeButton = subscription?.tier === 'Free';
+  const showContactSalesButton = subscription?.tier === 'Pro';
+
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Chat with Assistant', icon: <ChatIcon />, path: '/chat' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
+    { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
+    { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },
+    { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
   ];
 
   const drawer = (
@@ -94,10 +113,65 @@ const MainLayout = () => {
       </List>
       <Divider />
       <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+            Google Ads
+          </Typography>
+          {!canUseGoogleAds && (
+            <Tooltip title="This feature requires Pro or Enterprise subscription">
+              <LockIcon fontSize="small" color="action" />
+            </Tooltip>
+          )}
+        </Box>
+        {canUseGoogleAds ? (
+          <GoogleAdsCreationButton />
+        ) : (
+          <Button 
+            variant="outlined" 
+            size="small" 
+            disabled 
+            fullWidth 
+            sx={{ mb: 1 }}
+          >
+            Create Google Ads
+          </Button>
+        )}
+      </Box>
+      <Divider />
+      <Box sx={{ p: 2 }}>
         <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-          Google Ads
+          Current Plan: <Chip size="small" label={subscription?.tier || 'Free'} color={
+            subscription?.tier === 'Pro' ? 'secondary' : 
+            subscription?.tier === 'Enterprise' ? 'warning' : 
+            'primary'
+          } />
         </Typography>
-        <GoogleAdsCreationButton />
+        
+        {showUpgradeButton && (
+          <Button
+            variant="contained"
+            color="secondary"
+            size="small"
+            fullWidth
+            onClick={() => navigate('/subscriptions')}
+            startIcon={<StarBorderIcon />}
+          >
+            Upgrade to Pro
+          </Button>
+        )}
+        
+        {showContactSalesButton && (
+          <Button
+            variant="outlined"
+            color="warning"
+            size="small"
+            fullWidth
+            onClick={() => navigate('/subscriptions')}
+            startIcon={<ContactSupportIcon />}
+          >
+            Enterprise Solutions
+          </Button>
+        )}
       </Box>
     </div>
   );
@@ -125,7 +199,24 @@ const MainLayout = () => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Ad Campaign Manager
           </Typography>
-          <GoogleAdsLinkButton />
+          
+          {/* Only show Google Ads button if user has appropriate tier */}
+          {canUseGoogleAds ? (
+            <GoogleAdsLinkButton />
+          ) : (
+            <Tooltip title="Upgrade to Pro to connect Google Ads">
+              <Button
+                variant="contained"
+                color="inherit"
+                onClick={() => navigate('/subscriptions')}
+                startIcon={<LockIcon />}
+                sx={{ ml: 2 }}
+              >
+                Pro Feature
+              </Button>
+            </Tooltip>
+          )}
+          
           <Button
             color="inherit"
             onClick={handleProfileMenuOpen}
@@ -142,6 +233,15 @@ const MainLayout = () => {
             open={Boolean(anchorEl)}
             onClose={handleProfileMenuClose}
           >
+            <MenuItem onClick={() => { 
+              handleProfileMenuClose();
+              navigate('/subscriptions');
+            }}>
+              <ListItemIcon>
+                <SubscriptionsIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Subscriptions</ListItemText>
+            </MenuItem>
             <MenuItem onClick={handleProfileMenuClose}>
               <ListItemIcon>
                 <PersonIcon fontSize="small" />

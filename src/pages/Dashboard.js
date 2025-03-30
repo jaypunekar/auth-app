@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,6 +26,9 @@ import {
   FormControl,
   InputLabel,
   Snackbar,
+  Tooltip,
+  Container,
+  AlertTitle,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -37,12 +40,15 @@ import {
   ThumbUp as ThumbUpIcon,
   ThumbDown as ThumbDownIcon,
   Chat as ChatIcon,
+  Star as StarIcon,
+  LockOutlined as LockIcon,
 } from '@mui/icons-material';
 import { adCampaignAPI, googleAdsAPI, feedbackAPI } from '../services/api';
 import AuthDebug from '../components/AuthDebug';
 import ImageGenerator from '../components/ImageGeneration/ImageGenerator';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useAuth } from '../context/AuthContext';
 
 // Helper function to group campaigns by platform
 const groupCampaignsByPlatform = (campaigns) => {
@@ -103,6 +109,7 @@ function TabPanel(props) {
 }
 
 const Dashboard = () => {
+  const { subscription } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [googleAdsCampaigns, setGoogleAdsCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +153,20 @@ const Dashboard = () => {
   const [dislikedResponses, setDislikedResponses] = useState([]);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
+
+  // Check if user has Pro or Enterprise tier
+  const canUseGoogleAds = subscription?.features?.can_use_google_ads || false;
+  
+  // Check how many campaigns the user can create
+  const maxCampaigns = subscription?.features?.max_campaigns || 5;
+  const campaignsRemaining = maxCampaigns > 0 ? maxCampaigns - campaigns.length : -1;
+  const canCreateCampaign = maxCampaigns === -1 || campaignsRemaining > 0;
+
+  // Check if payment has failed and subscription is in grace period
+  const hasPaymentFailed = subscription?.payment_status === 'past_due' || subscription?.payment_status === 'unpaid';
+  const graceEndDate = subscription?.grace_period_end 
+    ? new Date(subscription.grace_period_end).toLocaleDateString()
+    : null;
 
   // Add a formatCampaignDate helper function near the top of the component (after all your useState declarations)
   const formatCampaignDate = (dateString) => {
@@ -322,12 +343,53 @@ const Dashboard = () => {
     const startDate = campaign.start_date || campaign.startDate;
     const endDate = campaign.end_date || campaign.endDate;
     
+    // Format dates to YYYY-MM-DD format if they exist
+    let formattedStartDate = '';
+    let formattedEndDate = '';
+    
+    if (startDate) {
+      // Handle potential different date formats
+      try {
+        // Try to parse the date
+        const date = new Date(startDate);
+        if (!isNaN(date.getTime())) {
+          formattedStartDate = date.toISOString().slice(0, 10); // YYYY-MM-DD format
+        } else if (typeof startDate === 'string' && startDate.length === 8) {
+          // Handle YYYYMMDD format from Google Ads
+          formattedStartDate = `${startDate.slice(0, 4)}-${startDate.slice(4, 6)}-${startDate.slice(6, 8)}`;
+        } else {
+          formattedStartDate = startDate;
+        }
+      } catch (e) {
+        console.error('Error formatting start date:', e);
+        formattedStartDate = startDate;
+      }
+    }
+    
+    if (endDate) {
+      try {
+        // Try to parse the date
+        const date = new Date(endDate);
+        if (!isNaN(date.getTime())) {
+          formattedEndDate = date.toISOString().slice(0, 10); // YYYY-MM-DD format
+        } else if (typeof endDate === 'string' && endDate.length === 8) {
+          // Handle YYYYMMDD format from Google Ads
+          formattedEndDate = `${endDate.slice(0, 4)}-${endDate.slice(4, 6)}-${endDate.slice(6, 8)}`;
+        } else {
+          formattedEndDate = endDate;
+        }
+      } catch (e) {
+        console.error('Error formatting end date:', e);
+        formattedEndDate = endDate;
+      }
+    }
+    
     setUpdatedCampaignData({
       name: campaign.name,
       status: campaign.status,
       daily_budget: campaign.budget.toString(),
-      startDate: startDate || '',
-      endDate: endDate || ''
+      startDate: formattedStartDate,
+      endDate: formattedEndDate
     });
     setUpdateDialogOpen(true);
   };
@@ -344,7 +406,11 @@ const Dashboard = () => {
     });
   };
 
+  const [isUpdating, setIsUpdating] = useState(false);
+
   const handleSubmitUpdate = async () => {
+    setIsUpdating(true);
+    
     try {
       // Create update payload with all fields including dates
       const updatePayload = {
@@ -394,6 +460,65 @@ const Dashboard = () => {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
+      setIsUpdating(false);
+      handleUpdateDialogClose();
+    }
+  };
+  
+  const handleTestDirectUpdate = async () => {
+    setIsUpdating(true);
+    
+    try {
+      // Create update payload with all fields including dates
+      const updatePayload = {
+        name: updatedCampaignData.name,
+        status: updatedCampaignData.status,
+        daily_budget: updatedCampaignData.daily_budget,
+        start_date: updatedCampaignData.startDate,
+        end_date: updatedCampaignData.endDate
+      };
+      
+      // Use the test update endpoint
+      const response = await googleAdsAPI.testUpdateCampaign(
+        selectedCampaign.id,
+        updatePayload
+      );
+
+      if (response.success) {
+        // Update the campaign in the state
+        const updatedCampaigns = googleAdsCampaigns.map((campaign) =>
+          campaign.id === selectedCampaign.id
+            ? {
+                ...campaign,
+                name: updatedCampaignData.name,
+                status: updatedCampaignData.status,
+                budget: parseFloat(updatedCampaignData.daily_budget),
+                start_date: updatedCampaignData.startDate,
+                startDate: updatedCampaignData.startDate,
+                end_date: updatedCampaignData.endDate,
+                endDate: updatedCampaignData.endDate
+              }
+            : campaign
+        );
+        setGoogleAdsCampaigns(updatedCampaigns);
+
+        // Show success message
+        setSnackbarMessage('Campaign updated successfully (Direct API)');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+      } else {
+        // Show error message
+        setSnackbarMessage(response.message || 'Failed to update campaign');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
+      }
+    } catch (err) {
+      console.error('Error in direct campaign update:', err);
+      setSnackbarMessage('Failed to directly update campaign');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setIsUpdating(false);
       handleUpdateDialogClose();
     }
   };
@@ -445,9 +570,22 @@ const Dashboard = () => {
   // Handler for opening the update ad dialog
   const handleUpdateAd = (ad) => {
     setSelectedAd(ad);
+    // Ensure proper format for headlines and descriptions
+    const headlines = Array.isArray(ad.headlines) ? 
+      ad.headlines.map(h => ({
+        text: h.text || "",
+        pinnedField: h.pinnedField || null
+      })) : [];
+      
+    const descriptions = Array.isArray(ad.descriptions) ? 
+      ad.descriptions.map(d => ({
+        text: d.text || "",
+        pinnedField: d.pinnedField || null
+      })) : [];
+      
     setUpdatedAdData({
-      headlines: ad.headlines || [],
-      descriptions: ad.descriptions || [],
+      headlines: headlines,
+      descriptions: descriptions,
       finalUrl: ad.finalUrl || ''
     });
     setResponsiveAdUpdateDialogOpen(true);
@@ -486,9 +624,34 @@ const Dashboard = () => {
   // Handler for submitting ad updates
   const handleSubmitAdUpdate = async () => {
     try {
-      const updateResponse = await googleAdsAPI.updateResponsiveSearchAd(
+      setUpdatingAd(true);
+      
+      // Prepare the data for the API - ensure we're sending the expected format
+      let finalUrl = updatedAdData.finalUrl;
+      
+      // Ensure final URL has proper format
+      if (finalUrl && !finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+        finalUrl = "https://" + finalUrl;
+      }
+      
+      const adData = {
+        headlines: updatedAdData.headlines.filter(h => h.text && h.text.trim()).map(h => ({
+          text: h.text.trim(),
+          pinnedField: h.pinnedField
+        })),
+        descriptions: updatedAdData.descriptions.filter(d => d.text && d.text.trim()).map(d => ({
+          text: d.text.trim(),
+          pinnedField: d.pinnedField
+        })),
+        finalUrl: finalUrl
+      };
+      
+      console.log("Sending ad update data:", adData);
+      
+      // Use the simplified update endpoint instead
+      const updateResponse = await googleAdsAPI.updateAdSimple(
         selectedAd.id,
-        updatedAdData
+        adData
       );
       
       if (updateResponse.data && updateResponse.data.success) {
@@ -497,9 +660,9 @@ const Dashboard = () => {
           ad.id === selectedAd.id 
             ? {
                 ...ad,
-                headlines: updatedAdData.headlines,
-                descriptions: updatedAdData.descriptions,
-                finalUrl: updatedAdData.finalUrl
+                headlines: adData.headlines,
+                descriptions: adData.descriptions,
+                finalUrl: adData.finalUrl
               }
             : ad
         );
@@ -521,6 +684,7 @@ const Dashboard = () => {
       setSnackbarSeverity('error');
       setSnackbarOpen(true);
     } finally {
+      setUpdatingAd(false);
       handleUpdateAdDialogClose();
     }
   };
@@ -604,6 +768,8 @@ const Dashboard = () => {
     setReviewTab(newValue);
   };
 
+  const [updatingAd, setUpdatingAd] = useState(false);
+
   if (loading && googleAdsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -616,21 +782,140 @@ const Dashboard = () => {
   const platforms = Object.keys(groupedCampaigns);
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
+    <Container>
+      {/* Payment Warning Alert */}
+      {hasPaymentFailed && subscription.tier === 'Pro' && (
+        <Alert 
+          severity="error" 
+          sx={{ mb: 4 }}
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              component={RouterLink} 
+              to="/subscriptions"
+            >
+              Update Payment
+            </Button>
+          }
+        >
+          <AlertTitle>Subscription Payment Failed</AlertTitle>
+          Your Pro subscription payment has failed. Pro features will be disabled on {graceEndDate}. Please update your payment method to continue using premium features.
+        </Alert>
+      )}
+      
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
           Dashboard
         </Typography>
-        <Button
-          component={RouterLink}
-          to="/campaigns/new"
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-        >
-          New Campaign
-        </Button>
+        <Typography variant="body1" color="text.secondary">
+          Manage your campaigns and analytics
+        </Typography>
       </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Dashboard
+        </Typography>
+        <Box>
+          {canCreateCampaign ? (
+            <Button
+              variant="contained"
+              color="primary"
+              component={RouterLink}
+              to="/campaigns/new"
+              startIcon={<AddIcon />}
+            >
+              Create Campaign
+            </Button>
+          ) : (
+            <Tooltip title="You've reached the maximum number of campaigns for your plan">
+              <span>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  disabled
+                  startIcon={<AddIcon />}
+                >
+                  Create Campaign
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+          
+          {subscription?.tier === 'Free' && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              component={RouterLink}
+              to="/subscriptions"
+              startIcon={<StarIcon />}
+              sx={{ ml: 2 }}
+            >
+              Upgrade to Pro
+            </Button>
+          )}
+        </Box>
+      </Box>
+      
+      {!loading && campaigns.length === 0 && !error && (
+        <Alert
+          severity="info"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              component={RouterLink}
+              to="/campaigns/new"
+            >
+              Create Campaign
+            </Button>
+          }
+          sx={{ mb: 4 }}
+        >
+          No campaigns found. Create your first ad campaign to get started!
+        </Alert>
+      )}
+      
+      {subscription?.tier === 'Free' && (
+        <Alert 
+          severity="info" 
+          sx={{ mb: 4 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              component={RouterLink}
+              to="/subscriptions"
+            >
+              Upgrade
+            </Button>
+          }
+        >
+          You're on the Free tier. Upgrade to Pro to access Google Ads integration and create up to 50 campaigns!
+        </Alert>
+      )}
+      
+      {maxCampaigns > 0 && (
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+            Campaign limit: {campaigns.length}/{maxCampaigns}
+          </Typography>
+          {campaignsRemaining <= 2 && (
+            <Chip 
+              label={`${campaignsRemaining} remaining`} 
+              size="small" 
+              color={campaignsRemaining === 0 ? "error" : "warning"} 
+            />
+          )}
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
+      )}
       
       <Tabs 
         value={activeTab} 
@@ -747,96 +1032,124 @@ const Dashboard = () => {
       </TabPanel>
       
       <TabPanel value={activeTab} index={1}>
-        {/* Google Ads Tab Content */}
-        {googleAdsError && (
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {googleAdsError}
-          </Alert>
-        )}
-
-        {googleAdsLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : googleAdsCampaigns.length === 0 ? (
+        {!canUseGoogleAds ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              No Google Ads campaigns found
+            <Box sx={{ mb: 2 }}>
+              <LockIcon fontSize="large" color="action" />
+            </Box>
+            <Typography variant="h6" gutterBottom>
+              Google Ads Integration is a Pro Feature
             </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              Create your first Google Ads campaign to get started
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Upgrade to Pro tier to connect your Google Ads account and manage campaigns directly.
             </Typography>
             <Button
               variant="contained"
-              startIcon={<GoogleIcon />}
+              color="secondary"
               component={RouterLink}
-              to="/google-ads/new"
+              to="/subscriptions"
+              startIcon={<StarIcon />}
             >
-              Create Google Ads Campaign
+              Upgrade to Pro
             </Button>
           </Box>
         ) : (
-          <Box sx={{ mt: 3 }}>
-            <Grid container spacing={3}>
-              {googleAdsCampaigns.map((campaign) => (
-                <Grid item xs={12} sm={6} md={4} key={campaign.id}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography variant="h6" component="div" noWrap gutterBottom>
-                        {campaign.name}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <Chip
-                          label={campaign.status}
-                          size="small"
-                          color={getStatusColor(campaign.status)}
-                          variant="outlined"
-                          sx={{ mr: 1 }}
-                        />
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {campaign.channel_type || campaign.campaignType || 'Search Campaign'}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Budget: ${campaign.budget}/day
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          <strong>Start Date:</strong> {formatCampaignDate(campaign.startDate || campaign.start_date || campaign.start_date_raw)}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          <strong>End Date:</strong> {formatCampaignDate(campaign.endDate || campaign.end_date || campaign.end_date_raw)}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                    <CardActions>
-                      <Button
-                        size="small"
-                        startIcon={<UpdateIcon />}
-                        onClick={() => handleUpdateCampaign(campaign)}
-                      >
-                        Update
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() => handleViewResponsiveAds(campaign.id)}
-                      >
-                        View Ads
-                      </Button>
-                      <Button
-                        size="small"
-                        color="error"
-                        startIcon={<DeleteIcon />}
-                        onClick={() => handleOpenDeleteDialog(campaign)}
-                      >
-                        Delete
-                      </Button>
-                    </CardActions>
-                  </Card>
+          <>
+            {googleAdsError && (
+              <Alert severity="error" sx={{ mb: 3 }}>
+                {googleAdsError}
+              </Alert>
+            )}
+
+            {googleAdsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : googleAdsCampaigns.length === 0 ? (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No Google Ads campaigns found
+                </Typography>
+                <Typography variant="body1" color="text.secondary" paragraph>
+                  Create your first Google Ads campaign to get started
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<GoogleIcon />}
+                  component={RouterLink}
+                  to="/google-ads/new"
+                >
+                  Create Google Ads Campaign
+                </Button>
+              </Box>
+            ) : (
+              <Box sx={{ mt: 3 }}>
+                <Grid container spacing={3}>
+                  {googleAdsCampaigns.map((campaign) => (
+                    <Grid item xs={12} sm={6} md={4} key={campaign.id}>
+                      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <CardContent sx={{ flexGrow: 1 }}>
+                          <Typography variant="h6" component="div" noWrap gutterBottom>
+                            {campaign.name}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Chip
+                              label={campaign.status}
+                              size="small"
+                              color={getStatusColor(campaign.status)}
+                              variant="outlined"
+                              sx={{ mr: 1 }}
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            {campaign.channel_type || campaign.campaignType || 'Search Campaign'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Budget: ${campaign.budget}/day
+                          </Typography>
+                          <Box sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Start Date:</strong> {formatCampaignDate(campaign.startDate || campaign.start_date || campaign.start_date_raw)}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>End Date:</strong> {formatCampaignDate(campaign.endDate || campaign.end_date || campaign.end_date_raw)}
+                            </Typography>
+                          </Box>
+                          
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            color="primary"
+                            sx={{ mt: 2 }}
+                            onClick={() => handleViewResponsiveAds(campaign.id)}
+                          >
+                            View & Edit Ads
+                          </Button>
+                        </CardContent>
+                        <CardActions>
+                          <Button
+                            size="small"
+                            startIcon={<UpdateIcon />}
+                            onClick={() => handleUpdateCampaign(campaign)}
+                          >
+                            Update
+                          </Button>
+                          <Button
+                            size="small"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleOpenDeleteDialog(campaign)}
+                          >
+                            Delete
+                          </Button>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
-            </Grid>
-          </Box>
+              </Box>
+            )}
+          </>
         )}
       </TabPanel>
       
@@ -1010,9 +1323,12 @@ const Dashboard = () => {
                   fullWidth
                   margin="normal"
                   value={updatedCampaignData.startDate}
-                  onChange={(e) => handleUpdateFieldChange('startDate', e.target.value)}
+                  disabled={true}
+                  InputProps={{
+                    readOnly: true,
+                  }}
                   placeholder="YYYY-MM-DD"
-                  helperText="Google Ads uses format YYYY-MM-DD"
+                  helperText="Start date cannot be modified once campaign has started"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1031,7 +1347,20 @@ const Dashboard = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={handleUpdateDialogClose}>Cancel</Button>
-          <Button onClick={handleSubmitUpdate} variant="contained" color="primary">
+          <Button 
+            onClick={handleTestDirectUpdate} 
+            color="secondary" 
+            sx={{ mr: 1 }}
+            disabled={isUpdating}
+          >
+            Test Direct Update
+          </Button>
+          <Button 
+            onClick={handleSubmitUpdate} 
+            variant="contained" 
+            color="primary"
+            disabled={isUpdating}
+          >
             Update
           </Button>
         </DialogActions>
@@ -1146,46 +1475,198 @@ const Dashboard = () => {
         <DialogTitle>Update Responsive Search Ad</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Google Ads requires a minimum of 3 headlines and 2 descriptions for responsive search ads.
+              The system will mix and match your headlines and descriptions to find the best performing combinations.
+            </Typography>
+            
             <Typography variant="h6" gutterBottom>Headlines</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add 3-15 headlines (min 3, max 15). Each headline can be up to 30 characters.
+            </Typography>
             {updatedAdData.headlines.map((headline, index) => (
               <TextField
                 key={index}
                 label={`Headline ${index + 1}`}
                 value={headline.text || ''}
-                onChange={(e) => handleUpdateAdField('headline', { ...headline, text: e.target.value }, index)}
+                onChange={(e) => {
+                  const newHeadlines = [...updatedAdData.headlines];
+                  newHeadlines[index] = { ...headline, text: e.target.value };
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    headlines: newHeadlines
+                  });
+                }}
                 fullWidth
                 margin="normal"
-                helperText={headline.pinnedField ? `Pinned to ${headline.pinnedField}` : ''}
+                helperText={headline.pinnedField ? `Pinned to ${headline.pinnedField}` : `${headline.text ? headline.text.length : 0}/30 characters`}
+                error={headline.text && headline.text.length > 30}
+                InputProps={{
+                  endAdornment: (
+                    <Typography variant="caption" color={headline.text && headline.text.length > 30 ? "error" : "text.secondary"}>
+                      {headline.text ? headline.text.length : 0}/30
+                    </Typography>
+                  )
+                }}
               />
             ))}
             
+            {updatedAdData.headlines.length < 15 && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                sx={{ mt: 1, mb: 3 }}
+                onClick={() => {
+                  const newHeadlines = [...updatedAdData.headlines, { text: '', pinnedField: null }];
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    headlines: newHeadlines
+                  });
+                }}
+              >
+                + Add Another Headline
+              </Button>
+            )}
+            
             <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Descriptions</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add 2-4 descriptions (min 2, max 4). Each description can be up to 90 characters.
+            </Typography>
             {updatedAdData.descriptions.map((description, index) => (
               <TextField
                 key={index}
                 label={`Description ${index + 1}`}
                 value={description.text || ''}
-                onChange={(e) => handleUpdateAdField('description', { ...description, text: e.target.value }, index)}
+                onChange={(e) => {
+                  const newDescriptions = [...updatedAdData.descriptions];
+                  newDescriptions[index] = { ...description, text: e.target.value };
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    descriptions: newDescriptions
+                  });
+                }}
                 fullWidth
                 margin="normal"
                 multiline
                 rows={2}
-                helperText={description.pinnedField ? `Pinned to ${description.pinnedField}` : ''}
+                helperText={description.pinnedField ? `Pinned to ${description.pinnedField}` : `${description.text ? description.text.length : 0}/90 characters`}
+                error={description.text && description.text.length > 90}
+                InputProps={{
+                  endAdornment: (
+                    <Typography variant="caption" color={description.text && description.text.length > 90 ? "error" : "text.secondary"}>
+                      {description.text ? description.text.length : 0}/90
+                    </Typography>
+                  )
+                }}
               />
             ))}
             
+            {updatedAdData.descriptions.length < 4 && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                sx={{ mt: 1, mb: 3 }}
+                onClick={() => {
+                  const newDescriptions = [...updatedAdData.descriptions, { text: '', pinnedField: null }];
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    descriptions: newDescriptions
+                  });
+                }}
+              >
+                + Add Another Description
+              </Button>
+            )}
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Final URL</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              This is the landing page users will go to when they click your ad.
+            </Typography>
             <TextField
               label="Final URL"
-              value={updatedAdData.finalUrl}
-              onChange={(e) => handleUpdateAdField('finalUrl', e.target.value)}
+              value={updatedAdData.finalUrl || ''}
+              onChange={(e) => {
+                setUpdatedAdData({
+                  ...updatedAdData,
+                  finalUrl: e.target.value
+                });
+              }}
               fullWidth
               margin="normal"
+              placeholder="https://www.example.com"
+              helperText="Make sure your URL includes http:// or https://"
             />
+            
+            <Box sx={{ mt: 3, mb: 2, p: 2, bgcolor: 'rgba(0, 0, 0, 0.04)', borderRadius: 1 }}>
+              <Typography variant="h6" gutterBottom>Ad Preview</Typography>
+              
+              <Box sx={{ 
+                mb: 2, 
+                p: 2, 
+                border: '1px solid #ddd', 
+                borderRadius: 1, 
+                backgroundColor: '#fff',
+                maxWidth: '600px'
+              }}>
+                {/* URL in green */}
+                <Typography variant="body2" sx={{ color: '#1a0dab', fontSize: '16px', fontWeight: 'bold' }}>
+                  {updatedAdData.headlines[0]?.text || '[Headline 1]'}
+                </Typography>
+                
+                {/* Display URL in green */}
+                <Typography variant="body2" sx={{ color: '#006621', fontSize: '14px' }}>
+                  {updatedAdData.finalUrl ? updatedAdData.finalUrl.replace(/^https?:\/\//i, '') : 'www.example.com'}
+                </Typography>
+                
+                {/* Ad copy */}
+                <Typography variant="body2" sx={{ color: '#545454', fontSize: '14px', mt: 0.5 }}>
+                  {updatedAdData.descriptions[0]?.text || '[Description 1]'}
+                </Typography>
+                
+                {/* Additional headlines */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', mt: 1, gap: 1 }}>
+                  {updatedAdData.headlines.slice(1, 4).map((headline, index) => (
+                    headline.text ? (
+                      <Typography key={index} variant="body2" sx={{ 
+                        color: '#1a0dab',
+                        fontSize: '14px',
+                        '&:not(:last-child)::after': {
+                          content: '"|"',
+                          color: '#70757a',
+                          marginLeft: '4px',
+                          marginRight: '4px'
+                        }
+                      }}>
+                        {headline.text}
+                      </Typography>
+                    ) : null
+                  ))}
+                </Box>
+              </Box>
+              
+              <Typography variant="caption" color="text.secondary">
+                This is a simplified preview. Google Ads will automatically test different combinations of your headlines and descriptions.
+              </Typography>
+            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleUpdateAdDialogClose}>Cancel</Button>
-          <Button onClick={handleSubmitAdUpdate} variant="contained">Update</Button>
+          <Button 
+            onClick={handleSubmitAdUpdate} 
+            variant="contained"
+            disabled={
+              updatedAdData.headlines.filter(h => h.text && h.text.trim()).length < 3 || 
+              updatedAdData.descriptions.filter(d => d.text && d.text.trim()).length < 2 ||
+              !updatedAdData.finalUrl ||
+              updatedAdData.headlines.some(h => h.text && h.text.length > 30) ||
+              updatedAdData.descriptions.some(d => d.text && d.text.length > 90) ||
+              updatingAd
+            }
+            startIcon={updatingAd && <CircularProgress size={20} />}
+          >
+            {updatingAd ? 'Updating...' : 'Update Ad'}
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -1215,7 +1696,7 @@ const Dashboard = () => {
 
       {/* Add the AuthDebug component */}
       <AuthDebug />
-    </Box>
+    </Container>
   );
 };
 
