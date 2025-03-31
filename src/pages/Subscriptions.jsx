@@ -25,6 +25,8 @@ import {
   DialogContentText,
   DialogActions,
   Chip,
+  TextField,
+  IconButton,
 } from '@mui/material';
 import {
   Check as CheckIcon,
@@ -34,10 +36,221 @@ import {
   Warning as WarningIcon,
   CreditCard as CreditCardIcon,
   ContactSupport as ContactSupportIcon,
+  BugReport as BugReportIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { format, isPast } from 'date-fns';
+
+// Debug component to help identify API connection issues
+const SubscriptionDebugPanel = () => {
+  const [debugVisible, setDebugVisible] = useState(false);
+  const [apiUrl, setApiUrl] = useState('');
+  const [apiStatus, setApiStatus] = useState('Unknown');
+  const [testingApi, setTestingApi] = useState(false);
+  const [manualUrl, setManualUrl] = useState('');
+  
+  useEffect(() => {
+    // Get the current API URL from axios defaults or environment variables
+    const url = process.env.REACT_APP_API_URL || axios.defaults.baseURL || '/api';
+    setApiUrl(url);
+  }, []);
+  
+  const testApiConnection = async () => {
+    setTestingApi(true);
+    setApiStatus('Testing...');
+    
+    try {
+      const startTime = Date.now();
+      const response = await axios.get(`${apiUrl}/subscription/tiers`);
+      const endTime = Date.now();
+      
+      setApiStatus(`Connected (${endTime - startTime}ms) ✅ - Status: ${response.status}`);
+    } catch (err) {
+      setApiStatus(`Error: ${err.message} - Status: ${err.response?.status || 'Unknown'}`);
+      console.error('API test failed:', err);
+    } finally {
+      setTestingApi(false);
+    }
+  };
+  
+  const testCheckoutEndpoint = async () => {
+    setTestingApi(true);
+    setApiStatus('Testing checkout endpoint...');
+    
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Test using token:', token ? `${token.substring(0, 15)}...` : 'No token');
+      
+      const config = {
+        method: 'post',
+        url: `${apiUrl}/subscription/checkout`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      console.log('Making request with config:', config);
+      const response = await axios(config);
+      
+      console.log('Checkout test raw response:', response);
+      console.log('Checkout test response data:', response.data);
+      
+      if (response.data && response.data.checkout_url) {
+        const checkoutUrl = response.data.checkout_url;
+        setApiStatus(`✅ Checkout URL: ${checkoutUrl.substring(0, 30)}...`);
+        
+        // Store the URL for testing
+        window._lastCheckoutUrl = checkoutUrl;
+        
+        const testLink = document.createElement('a');
+        testLink.href = checkoutUrl;
+        testLink.target = '_blank';
+        testLink.textContent = 'Open checkout in new tab';
+        testLink.style.display = 'none';
+        
+        // Append the link to the document body
+        document.body.appendChild(testLink);
+        
+        // Trigger a click on the link
+        testLink.click();
+        
+        // Remove the link from the document
+        document.body.removeChild(testLink);
+      } else {
+        setApiStatus('❌ No checkout URL in response!');
+      }
+    } catch (err) {
+      console.error('Checkout test error:', err);
+      
+      let errorMessage = `Checkout Error: ${err.message}`;
+      if (err.response) {
+        errorMessage += ` - Status: ${err.response.status}`;
+        if (err.response.data && err.response.data.detail) {
+          errorMessage += ` - Detail: ${err.response.data.detail}`;
+        }
+      }
+      
+      setApiStatus(`❌ ${errorMessage}`);
+    } finally {
+      setTestingApi(false);
+    }
+  };
+  
+  // Add a method to navigate to a manual URL
+  const navigateToManualUrl = () => {
+    if (!manualUrl) {
+      setApiStatus('Please enter a URL first');
+      return;
+    }
+    
+    console.log('Navigating to manual URL:', manualUrl);
+    window.open(manualUrl, '_blank');
+  };
+  
+  if (!debugVisible) {
+    return (
+      <Box sx={{ position: 'fixed', bottom: 16, right: 16, zIndex: 1000 }}>
+        <IconButton 
+          color="primary" 
+          onClick={() => setDebugVisible(true)}
+          sx={{ bgcolor: 'background.paper', boxShadow: 2 }}
+        >
+          <BugReportIcon />
+        </IconButton>
+      </Box>
+    );
+  }
+  
+  return (
+    <Paper 
+      elevation={3} 
+      sx={{ 
+        p: 2, 
+        mb: 4, 
+        border: '1px dashed', 
+        borderColor: 'warning.main',
+        bgcolor: 'warning.light',
+        position: 'sticky',
+        top: 0,
+        zIndex: 100,
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6" component="div" color="warning.dark">
+          <BugReportIcon fontSize="small" sx={{ mr: 1, verticalAlign: 'middle' }} />
+          Subscription Debug Panel
+        </Typography>
+        <Button size="small" variant="outlined" color="inherit" onClick={() => setDebugVisible(false)}>
+          Close Debug Panel
+        </Button>
+      </Box>
+
+      <Grid container spacing={2}>
+        <Grid item xs={12}>
+          <Typography variant="body2" gutterBottom>
+            <strong>Environment:</strong> {process.env.NODE_ENV}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>API URL:</strong> {apiUrl}
+          </Typography>
+          <Typography variant="body2" gutterBottom>
+            <strong>API Status:</strong> {apiStatus}
+          </Typography>
+        </Grid>
+        <Grid item>
+          <Button 
+            variant="contained" 
+            size="small"
+            onClick={testApiConnection}
+            disabled={testingApi}
+          >
+            Test API Connection
+          </Button>
+        </Grid>
+        <Grid item>
+          <Button 
+            variant="contained" 
+            size="small"
+            onClick={testCheckoutEndpoint}
+            disabled={testingApi}
+          >
+            Test Checkout Endpoint
+          </Button>
+        </Grid>
+        
+        <Grid item xs={12} sx={{ mt: 2 }}>
+          <Divider>Manual URL Navigation</Divider>
+        </Grid>
+        
+        <Grid item xs={8}>
+          <TextField
+            size="small"
+            fullWidth
+            label="Checkout URL"
+            variant="outlined"
+            value={manualUrl}
+            onChange={(e) => setManualUrl(e.target.value)}
+            placeholder="Enter Stripe checkout URL..."
+          />
+        </Grid>
+        <Grid item xs={4}>
+          <Button
+            variant="contained"
+            color="primary"
+            size="small"
+            onClick={navigateToManualUrl}
+            disabled={!manualUrl}
+            sx={{ height: '100%' }}
+          >
+            Navigate
+          </Button>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+};
 
 const Subscriptions = () => {
   const { subscription, updateSubscription, loading, checkSubscription } = useAuth();
@@ -126,12 +339,48 @@ const Subscriptions = () => {
 
   const handleUpgradeToPro = async () => {
     setIsProcessing(true);
+    console.log("🔍 DEBUG: Starting upgrade to Pro process");
     try {
-      const response = await axios.post('/api/subscription/checkout');
+      // Use the API URL from environment variables, or fall back to relative path
+      const apiUrl = process.env.REACT_APP_API_URL || '/api';
+      const token = localStorage.getItem('token');
       
-      // Redirect to Stripe Checkout
-      window.location.href = response.data.checkout_url;
+      console.log("🔍 DEBUG: Making API call to checkout endpoint");
+      console.log("🔍 DEBUG: API URL:", apiUrl);
+      console.log("🔍 DEBUG: Token available:", !!token);
+
+      const response = await axios({
+        method: 'post',
+        url: `${apiUrl}/subscription/checkout`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log("🔍 DEBUG: API response:", response.data);
+      
+      if (!response.data || !response.data.checkout_url) {
+        console.error("🔍 DEBUG: No checkout_url in response!");
+        setError('Missing checkout URL in server response');
+        setIsProcessing(false);
+        return;
+      }
+      
+      console.log("🔍 DEBUG: Checkout URL:", response.data.checkout_url);
+      
+      // Add a confirmation for debugging in production
+      if (window.confirm(`Debug: About to redirect to: ${response.data.checkout_url}\nClick OK to proceed, Cancel to stay on this page.`)) {
+        console.log("🔍 DEBUG: Redirecting to:", response.data.checkout_url);
+        window.location.href = response.data.checkout_url;
+      } else {
+        console.log("🔍 DEBUG: Redirect cancelled by user");
+        setIsProcessing(false);
+      }
     } catch (err) {
+      console.error("🔍 DEBUG: Error details:", err);
+      console.error("🔍 DEBUG: Response data:", err.response?.data);
+      console.error("🔍 DEBUG: Status code:", err.response?.status);
       setError(err.response?.data?.detail || 'Failed to create checkout session');
       console.error('Error creating checkout session:', err);
       setIsProcessing(false);
@@ -212,6 +461,8 @@ const Subscriptions = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 8 }}>
+      <SubscriptionDebugPanel />
+      
       <Box sx={{ mb: 6 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Subscription Plans

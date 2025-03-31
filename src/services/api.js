@@ -4,6 +4,14 @@ import { getToken, storeToken, logout, debugAuth } from '../utils/auth';
 // Determine if we're in production
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Log API configuration for debugging
+console.log('🔄 API Configuration:', {
+  NODE_ENV: process.env.NODE_ENV,
+  REACT_APP_API_URL: process.env.REACT_APP_API_URL,
+  isProduction,
+  defaultURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api'
+});
+
 // Create axios instance
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
@@ -13,6 +21,9 @@ const api = axios.create({
   // Only use credentials (cookies) in development, not in production
   withCredentials: !isProduction,
 });
+
+// Make the api instance available globally for debugging
+window._api = api;
 
 // Add request interceptor to add auth token
 api.interceptors.request.use(
