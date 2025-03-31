@@ -311,7 +311,7 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div">
+                <Typography variant="h4" component="div" color="text.primary">
                   $0
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -325,7 +325,10 @@ const Subscriptions = () => {
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <CheckIcon color="success" fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText primary={feature} />
+                    <ListItemText 
+                      primary={feature} 
+                      primaryTypographyProps={{ color: 'text.primary' }} 
+                    />
                   </ListItem>
                 ))}
                 {tiers.Free?.limitations.map((limitation) => (
@@ -395,7 +398,7 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div">
+                <Typography variant="h4" component="div" color="text.primary">
                   ${tiers.Pro?.price}
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -409,7 +412,10 @@ const Subscriptions = () => {
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <CheckIcon color="success" fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText primary={feature} />
+                    <ListItemText 
+                      primary={feature} 
+                      primaryTypographyProps={{ color: 'text.primary' }} 
+                    />
                   </ListItem>
                 ))}
               </List>
@@ -452,7 +458,7 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div">
+                <Typography variant="h4" component="div" color="text.primary">
                   Custom
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -466,7 +472,10 @@ const Subscriptions = () => {
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <CheckIcon color="success" fontSize="small" />
                     </ListItemIcon>
-                    <ListItemText primary={feature} />
+                    <ListItemText 
+                      primary={feature} 
+                      primaryTypographyProps={{ color: 'text.primary' }} 
+                    />
                   </ListItem>
                 ))}
               </List>
