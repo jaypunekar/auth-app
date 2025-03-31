@@ -68,14 +68,61 @@ const Subscriptions = () => {
     }
   }, [location.search, navigate, checkSubscription]);
 
+  // Default tiers as fallback
+  const defaultTiers = {
+    "Free": {
+      "price": "0",
+      "features": [
+        "Create basic ad campaigns",
+        "Chat with AI assistant",
+        "Website analysis tool",
+        "Ad calendar",
+        "Social media analyzers",
+      ],
+      "limitations": [
+        "No Google Ads integration",
+        "Limited campaign creation",
+      ]
+    },
+    "Pro": {
+      "price": "1.00",
+      "features": [
+        "All Free tier features",
+        "Google Ads integration",
+        "Advanced campaign creation",
+        "Premium AI assistance",
+        "Advanced analytics",
+      ],
+      "limitations": []
+    },
+    "Enterprise": {
+      "price": "Custom pricing",
+      "features": [
+        "All Pro features",
+        "Custom integrations",
+        "Dedicated support",
+        "Custom AI training",
+        "White-label options",
+      ],
+      "limitations": []
+    }
+  };
+
   useEffect(() => {
     const fetchTiers = async () => {
       try {
+        console.log('Fetching subscription tiers...');
         const response = await axios.get('/api/subscription/tiers');
+        console.log('Subscription tiers response:', response);
+        console.log('Subscription tiers data:', response.data);
         setTiers(response.data);
       } catch (err) {
-        setError('Failed to load subscription information. Please try again later.');
         console.error('Error fetching subscription tiers:', err);
+        console.error('Error details:', err.response?.data || err.message);
+        setError('Failed to load subscription information. Using default tiers instead.');
+        // Use default tiers as fallback
+        console.log('Using default tiers as fallback');
+        setTiers(defaultTiers);
       } finally {
         setLoadingTiers(false);
       }
@@ -294,6 +341,7 @@ const Subscriptions = () => {
       <Grid container spacing={4}>
         {/* Free Tier */}
         <Grid item xs={12} md={4}>
+          {console.log('Rendering Free tier card with data:', tiers.Free)}
           <Card 
             elevation={4}
             sx={{
@@ -311,7 +359,7 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div" color="text.primary">
+                <Typography variant="h4" component="div">
                   $0
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -320,28 +368,33 @@ const Subscriptions = () => {
               </Box>
               <Divider sx={{ my: 2 }} />
               <List>
-                {tiers.Free?.features.map((feature) => (
-                  <ListItem key={feature} disablePadding>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <CheckIcon color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={feature} 
-                      primaryTypographyProps={{ color: 'text.primary' }} 
-                    />
+                {tiers.Free?.features && Array.isArray(tiers.Free.features) ? (
+                  tiers.Free.features.map((feature) => (
+                    <ListItem key={feature} disablePadding>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CheckIcon color="success" fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary={feature} primaryTypographyProps={{ color: 'text.primary' }} />
+                    </ListItem>
+                  ))
+                ) : (
+                  <ListItem disablePadding>
+                    <ListItemText primary="Features data not available" />
                   </ListItem>
-                ))}
-                {tiers.Free?.limitations.map((limitation) => (
-                  <ListItem key={limitation} disablePadding>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <CloseIcon color="error" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={limitation} 
-                      primaryTypographyProps={{ color: 'text.secondary' }} 
-                    />
-                  </ListItem>
-                ))}
+                )}
+                {tiers.Free?.limitations && Array.isArray(tiers.Free.limitations) ? (
+                  tiers.Free.limitations.map((limitation) => (
+                    <ListItem key={limitation} disablePadding>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CloseIcon color="error" fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={limitation} 
+                        primaryTypographyProps={{ color: 'text.primary' }} 
+                      />
+                    </ListItem>
+                  ))
+                ) : null}
               </List>
             </CardContent>
             <CardActions>
@@ -360,6 +413,7 @@ const Subscriptions = () => {
 
         {/* Pro Tier */}
         <Grid item xs={12} md={4}>
+          {console.log('Rendering Pro tier card with data:', tiers.Pro)}
           <Card 
             elevation={4}
             sx={{
@@ -398,8 +452,8 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div" color="text.primary">
-                  ${tiers.Pro?.price}
+                <Typography variant="h4" component="div">
+                  ${tiers.Pro?.price || '1.00'}
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
                   per month
@@ -407,17 +461,20 @@ const Subscriptions = () => {
               </Box>
               <Divider sx={{ my: 2 }} />
               <List>
-                {tiers.Pro?.features.map((feature) => (
-                  <ListItem key={feature} disablePadding>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <CheckIcon color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={feature} 
-                      primaryTypographyProps={{ color: 'text.primary' }} 
-                    />
+                {tiers.Pro?.features && Array.isArray(tiers.Pro.features) ? (
+                  tiers.Pro.features.map((feature) => (
+                    <ListItem key={feature} disablePadding>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CheckIcon color="success" fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary={feature} primaryTypographyProps={{ color: 'text.primary' }} />
+                    </ListItem>
+                  ))
+                ) : (
+                  <ListItem disablePadding>
+                    <ListItemText primary="Features data not available" />
                   </ListItem>
-                ))}
+                )}
               </List>
             </CardContent>
             <CardActions>
@@ -441,6 +498,7 @@ const Subscriptions = () => {
 
         {/* Enterprise Tier */}
         <Grid item xs={12} md={4}>
+          {console.log('Rendering Enterprise tier card with data:', tiers.Enterprise)}
           <Card 
             elevation={4}
             sx={{
@@ -458,7 +516,7 @@ const Subscriptions = () => {
             />
             <CardContent sx={{ flexGrow: 1 }}>
               <Box sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" component="div" color="text.primary">
+                <Typography variant="h4" component="div">
                   Custom
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
@@ -467,17 +525,20 @@ const Subscriptions = () => {
               </Box>
               <Divider sx={{ my: 2 }} />
               <List>
-                {tiers.Enterprise?.features.map((feature) => (
-                  <ListItem key={feature} disablePadding>
-                    <ListItemIcon sx={{ minWidth: 32 }}>
-                      <CheckIcon color="success" fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary={feature} 
-                      primaryTypographyProps={{ color: 'text.primary' }} 
-                    />
+                {tiers.Enterprise?.features && Array.isArray(tiers.Enterprise.features) ? (
+                  tiers.Enterprise.features.map((feature) => (
+                    <ListItem key={feature} disablePadding>
+                      <ListItemIcon sx={{ minWidth: 32 }}>
+                        <CheckIcon color="success" fontSize="small" />
+                      </ListItemIcon>
+                      <ListItemText primary={feature} primaryTypographyProps={{ color: 'text.primary' }} />
+                    </ListItem>
+                  ))
+                ) : (
+                  <ListItem disablePadding>
+                    <ListItemText primary="Features data not available" />
                   </ListItem>
-                ))}
+                )}
               </List>
             </CardContent>
             <CardActions>
