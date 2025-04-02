@@ -23,15 +23,21 @@ export const AuthProvider = ({ children }) => {
   // Check user subscription
   const checkSubscription = async () => {
     try {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated) {
+        console.log('Not checking subscription - user not authenticated');
+        return;
+      }
       
       console.log('Checking subscription status...');
-      const response = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/subscription/current`);
+      // Use the correct URL for the subscription endpoint
+      const response = await axios.get(`${process.env.REACT_APP_API_URL || '/api'}/subscription`);
       console.log('Subscription data received:', response.data);
       setSubscription(response.data);
       return response.data;
     } catch (err) {
       console.error('Error fetching subscription info:', err);
+      console.error('Error details:', err.response?.data || 'No response data');
+      console.error('Status:', err.response?.status || 'No status code');
       return null;
     }
   };
@@ -311,6 +317,9 @@ export const AuthProvider = ({ children }) => {
         
         setUser(userResponse.data);
         setIsAuthenticated(true);
+        
+        // Check subscription immediately after Google login
+        await checkSubscription();
         
         // Log auth debug info
         console.log('Auth state after Google login:', debugAuth());

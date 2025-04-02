@@ -138,6 +138,57 @@ const SubscriptionDebugPanel = () => {
     }
   };
   
+  // Add a test function for the force-upgrade endpoint
+  const testForceUpgrade = async () => {
+    setTestingApi(true);
+    setApiStatus('Testing force-upgrade endpoint...');
+    
+    try {
+      const token = localStorage.getItem('token');
+      console.log('Test using token:', token ? `${token.substring(0, 15)}...` : 'No token');
+      
+      const config = {
+        method: 'post',
+        url: `${apiUrl}/subscription/force-upgrade`,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      };
+      
+      console.log('Making force-upgrade request with config:', config);
+      const response = await axios(config);
+      
+      console.log('Force upgrade test raw response:', response);
+      console.log('Force upgrade test response data:', response.data);
+      
+      if (response.data && response.data.tier) {
+        setApiStatus(`✅ Successfully upgraded to ${response.data.tier} tier. Refreshing page in 2 seconds...`);
+        
+        // Refresh the page after a short delay to show the changes
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        setApiStatus('❌ Force upgrade succeeded but response has no tier information!');
+      }
+    } catch (err) {
+      console.error('Force upgrade test error:', err);
+      
+      let errorMessage = `Force Upgrade Error: ${err.message}`;
+      if (err.response) {
+        errorMessage += ` - Status: ${err.response.status}`;
+        if (err.response.data && err.response.data.detail) {
+          errorMessage += ` - Detail: ${err.response.data.detail}`;
+        }
+      }
+      
+      setApiStatus(`❌ ${errorMessage}`);
+    } finally {
+      setTestingApi(false);
+    }
+  };
+  
   // Add a method to navigate to a manual URL
   const navigateToManualUrl = () => {
     if (!manualUrl) {
@@ -220,6 +271,18 @@ const SubscriptionDebugPanel = () => {
           </Button>
         </Grid>
         
+        <Grid item>
+          <Button 
+            variant="contained" 
+            size="small"
+            color="warning"
+            onClick={testForceUpgrade}
+            disabled={testingApi}
+          >
+            Force Upgrade (Test)
+          </Button>
+        </Grid>
+        
         <Grid item xs={12} sx={{ mt: 2 }}>
           <Divider>Manual URL Navigation</Divider>
         </Grid>
@@ -269,8 +332,28 @@ const Subscriptions = () => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get('success') === 'true') {
-      setSuccess('Payment successful! Your subscription is now active.');
-      checkSubscription(); // Refresh the subscription status
+      setSuccess('Payment successful! Your subscription is now being activated...');
+      
+      // Check subscription immediately
+      checkSubscription().then(subData => {
+        if (subData && subData.tier === 'Pro') {
+          setSuccess('Payment successful! Your PRO subscription is now active.');
+        } else {
+          console.log('Subscription not showing as PRO yet, will retry in 2 seconds');
+          
+          // Try again in 2 seconds
+          setTimeout(() => {
+            checkSubscription().then(retryData => {
+              if (retryData && retryData.tier === 'Pro') {
+                setSuccess('Payment successful! Your PRO subscription is now active.');
+              } else {
+                console.log('Subscription still not showing as PRO after retry');
+                setSuccess('Payment successful! Your subscription will be activated shortly. If not activated in a few minutes, please refresh the page or use the "Force Upgrade" button in the debug panel (click the bug icon in the bottom right corner).');
+              }
+            });
+          }, 2000);
+        }
+      });
     } else if (searchParams.get('canceled') === 'true') {
       setError('Payment process was canceled.');
     }
@@ -369,14 +452,8 @@ const Subscriptions = () => {
       
       console.log("🔍 DEBUG: Checkout URL:", response.data.checkout_url);
       
-      // Add a confirmation for debugging in production
-      if (window.confirm(`Debug: About to redirect to: ${response.data.checkout_url}\nClick OK to proceed, Cancel to stay on this page.`)) {
-        console.log("🔍 DEBUG: Redirecting to:", response.data.checkout_url);
-        window.location.href = response.data.checkout_url;
-      } else {
-        console.log("🔍 DEBUG: Redirect cancelled by user");
-        setIsProcessing(false);
-      }
+      // Redirect to the checkout URL
+      window.location.href = response.data.checkout_url;
     } catch (err) {
       console.error("🔍 DEBUG: Error details:", err);
       console.error("🔍 DEBUG: Response data:", err.response?.data);
