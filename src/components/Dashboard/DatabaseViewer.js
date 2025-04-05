@@ -110,8 +110,8 @@ const DatabaseViewerContent = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('');
-  const [tableData, setTableData] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [tableData, setTableData] = useState({ columns: [], data: [] });
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
@@ -135,11 +135,13 @@ const DatabaseViewerContent = () => {
           }
         );
         
-        setTables(data || []);
+        // Ensure data is an array
+        const tablesArray = Array.isArray(data) ? data : [];
+        setTables(tablesArray);
         
         // Set the first table as the default
-        if (data && data.length > 0 && !selectedTable) {
-          setSelectedTable(data[0]);
+        if (tablesArray.length > 0 && !selectedTable) {
+          setSelectedTable(tablesArray[0]);
         }
       } catch (err) {
         console.error('Error in fetchTables:', err);
@@ -418,7 +420,7 @@ const DatabaseViewerContent = () => {
               onChange={handleTableChange}
               disabled={tables.length === 0}
             >
-              {tables.map((table) => (
+              {Array.isArray(tables) && tables.map((table) => (
                 <MenuItem key={table} value={table}>
                   {table}
                 </MenuItem>
@@ -431,7 +433,8 @@ const DatabaseViewerContent = () => {
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                {tableData.table_name} ({tableData.data && tableData.data.length ? tableData.data.length : 0} records shown)
+                {tableData.table_name || selectedTable || 'Table'} 
+                ({tableData.data && Array.isArray(tableData.data) ? tableData.data.length : 0} records shown)
               </Typography>
               <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
                 <InputLabel id="rows-per-page-label">Rows</InputLabel>
@@ -450,26 +453,27 @@ const DatabaseViewerContent = () => {
               </FormControl>
             </Box>
 
-            {tableData.data && Array.isArray(tableData.data) && tableData.data.length > 0 && tableData.columns ? (
+            {tableData.data && Array.isArray(tableData.data) && tableData.data.length > 0 && 
+             tableData.columns && Array.isArray(tableData.columns) && tableData.columns.length > 0 ? (
               <TableContainer component={Paper} sx={{ maxHeight: 600, overflow: 'auto' }}>
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
-                      {tableData.columns && tableData.columns.map((column) => (
-                        <TableCell key={column} sx={{ fontWeight: 'bold' }}>
-                          {column}
+                      {tableData.columns.map((column, colIndex) => (
+                        <TableCell key={`col-${colIndex}-${column || 'unnamed'}`} sx={{ fontWeight: 'bold' }}>
+                          {column || `Column ${colIndex + 1}`}
                         </TableCell>
                       ))}
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {tableData.data.map((row, rowIndex) => (
-                      <TableRow key={rowIndex} hover>
-                        {tableData.columns && tableData.columns.map((column) => (
-                          <TableCell key={column}>
-                            {row[column] === null 
+                      <TableRow key={`row-${rowIndex}`} hover>
+                        {tableData.columns.map((column, colIndex) => (
+                          <TableCell key={`cell-${rowIndex}-${colIndex}-${column || 'unnamed'}`}>
+                            {row && (row[column] === null || row[column] === undefined)
                               ? <Typography variant="body2" color="text.secondary">null</Typography> 
-                              : String(row[column])}
+                              : row && row[column] !== undefined ? String(row[column]) : ''}
                           </TableCell>
                         ))}
                       </TableRow>
