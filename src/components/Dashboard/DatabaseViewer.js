@@ -121,18 +121,27 @@ const DatabaseViewerContent = () => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [authError, setAuthError] = useState(false);
 
-  // Helper function to create authorized API call
-  const callWithAuth = async (url) => {
+  // Helper function to create API call with optional auth
+  const callApi = async (url) => {
     try {
-      const token = await getAccessToken();
-      return await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      // Try to get the token, but don't require it
+      let headers = {};
+      
+      try {
+        if (getAccessToken && typeof getAccessToken === 'function') {
+          const token = await getAccessToken();
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+          }
         }
-      });
+      } catch (tokenErr) {
+        console.log('Failed to get access token, continuing without authentication');
+      }
+      
+      // Make the API call with or without the token
+      return await axios.get(url, { headers });
     } catch (err) {
-      console.error(`Authentication error for ${url}:`, err);
-      setAuthError(true);
+      // Handle API errors normally
       throw err;
     }
   };
@@ -140,18 +149,14 @@ const DatabaseViewerContent = () => {
   // Fetch list of table names
   useEffect(() => {
     const fetchTables = async () => {
-      if (!user) {
-        setAuthError(true);
-        return;
-      }
-      
       setLoading(true);
       setError(null);
+      setAuthError(false);
       
       try {
-        // Use the safeApiCall utility with auth
+        // Use the safeApiCall utility with simplified auth
         const data = await safeApiCall(
-          () => callWithAuth('/api/admin/table-names'), 
+          () => callApi('/api/admin/table-names'), 
           [], // Fallback to empty array if the API call fails
           (err) => {
             // Custom error handling
@@ -183,22 +188,19 @@ const DatabaseViewerContent = () => {
     };
 
     fetchTables();
-  }, [user, getAccessToken]);
+  }, []);
 
   // Fetch database stats on mount
   useEffect(() => {
     const fetchStats = async () => {
-      if (!user) {
-        return;
-      }
-      
       setLoading(true);
       setError(null);
+      setAuthError(false);
       
       try {
         // Use the safeApiCall utility for better error handling
         const data = await safeApiCall(
-          () => callWithAuth('/api/admin/database-stats'),
+          () => callApi('/api/admin/database-stats'),
           {}, // Fallback to empty object if the API call fails
           (err) => {
             // Custom error handling
@@ -223,22 +225,23 @@ const DatabaseViewerContent = () => {
     };
 
     fetchStats();
-  }, [user, getAccessToken]);
+  }, []);
 
   // Fetch table data when selectedTable changes
   useEffect(() => {
-    if (!selectedTable || !user) return;
+    if (!selectedTable) return;
 
     const fetchTableData = async () => {
       setLoading(true);
       setError(null);
+      setAuthError(false);
       
       try {
         const offset = (page - 1) * rowsPerPage;
         
         // Use the safeApiCall utility for better error handling
         const data = await safeApiCall(
-          () => callWithAuth(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+          () => callApi(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
           { columns: [], data: [] }, // Fallback to empty structure if the API call fails
           (err) => {
             // Custom error handling
@@ -263,7 +266,7 @@ const DatabaseViewerContent = () => {
     };
 
     fetchTableData();
-  }, [selectedTable, page, rowsPerPage, user, getAccessToken]);
+  }, [selectedTable, page, rowsPerPage]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -280,11 +283,12 @@ const DatabaseViewerContent = () => {
       const fetchStats = async () => {
         setLoading(true);
         setError(null);
+        setAuthError(false);
         
         try {
           // Use the safeApiCall utility for better error handling
           const data = await safeApiCall(
-            () => callWithAuth('/api/admin/database-stats'),
+            () => callApi('/api/admin/database-stats'),
             {}, // Fallback to empty object if the API call fails
             (err) => {
               // Custom error handling
@@ -312,13 +316,14 @@ const DatabaseViewerContent = () => {
       const fetchTableData = async () => {
         setLoading(true);
         setError(null);
+        setAuthError(false);
         
         try {
           const offset = (page - 1) * rowsPerPage;
           
           // Use the safeApiCall utility for better error handling
           const data = await safeApiCall(
-            () => callWithAuth(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+            () => callApi(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
             { columns: [], data: [] }, // Fallback to empty structure if the API call fails
             (err) => {
               // Custom error handling
