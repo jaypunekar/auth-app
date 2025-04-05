@@ -450,12 +450,12 @@ const DatabaseViewerContent = () => {
               </FormControl>
             </Box>
 
-            {tableData.data && tableData.data.length > 0 && tableData.columns ? (
+            {tableData.data && Array.isArray(tableData.data) && tableData.data.length > 0 && tableData.columns ? (
               <TableContainer component={Paper} sx={{ maxHeight: 600, overflow: 'auto' }}>
                 <Table stickyHeader size="small">
                   <TableHead>
                     <TableRow>
-                      {tableData.columns.map((column) => (
+                      {tableData.columns && tableData.columns.map((column) => (
                         <TableCell key={column} sx={{ fontWeight: 'bold' }}>
                           {column}
                         </TableCell>
@@ -465,7 +465,7 @@ const DatabaseViewerContent = () => {
                   <TableBody>
                     {tableData.data.map((row, rowIndex) => (
                       <TableRow key={rowIndex} hover>
-                        {tableData.columns.map((column) => (
+                        {tableData.columns && tableData.columns.map((column) => (
                           <TableCell key={column}>
                             {row[column] === null 
                               ? <Typography variant="body2" color="text.secondary">null</Typography> 
