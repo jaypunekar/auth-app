@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { safeApiCall, retryApiCall } from '../../utils/apiUtils';
+import { useAuth } from '../../context/AuthContext';
 import {
   Box,
   Typography,
@@ -26,7 +27,8 @@ import {
   Grid,
   Chip,
   Divider,
-  Stack
+  Stack,
+  AlertTitle
 } from '@mui/material';
 import {
   Storage as StorageIcon,
@@ -107,6 +109,7 @@ const DatabaseViewer = () => {
 
 // Main component content
 const DatabaseViewerContent = () => {
+  const { user, getAccessToken } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('');
@@ -116,22 +119,49 @@ const DatabaseViewerContent = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [authError, setAuthError] = useState(false);
+
+  // Helper function to create authorized API call
+  const callWithAuth = async (url) => {
+    try {
+      const token = await getAccessToken();
+      return await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+    } catch (err) {
+      console.error(`Authentication error for ${url}:`, err);
+      setAuthError(true);
+      throw err;
+    }
+  };
 
   // Fetch list of table names
   useEffect(() => {
     const fetchTables = async () => {
+      if (!user) {
+        setAuthError(true);
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
       try {
-        // Use the safeApiCall utility for better error handling
+        // Use the safeApiCall utility with auth
         const data = await safeApiCall(
-          () => axios.get('/api/admin/table-names'), 
+          () => callWithAuth('/api/admin/table-names'), 
           [], // Fallback to empty array if the API call fails
           (err) => {
             // Custom error handling
             console.error('Error fetching tables:', err);
-            setError('Failed to load database tables: ' + (err.response?.data?.detail || err.message));
+            if (err.response?.status === 401 || err.response?.status === 403) {
+              setAuthError(true);
+              setError('You do not have permission to access this admin feature.');
+            } else {
+              setError('Failed to load database tables: ' + (err.response?.data?.detail || err.message));
+            }
           }
         );
         
@@ -153,23 +183,32 @@ const DatabaseViewerContent = () => {
     };
 
     fetchTables();
-  }, []);
+  }, [user, getAccessToken]);
 
   // Fetch database stats on mount
   useEffect(() => {
     const fetchStats = async () => {
+      if (!user) {
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       
       try {
         // Use the safeApiCall utility for better error handling
         const data = await safeApiCall(
-          () => axios.get('/api/admin/database-stats'),
+          () => callWithAuth('/api/admin/database-stats'),
           {}, // Fallback to empty object if the API call fails
           (err) => {
             // Custom error handling
             console.error('Error fetching database stats:', err);
-            setError('Failed to load database statistics: ' + (err.response?.data?.detail || err.message));
+            if (err.response?.status === 401 || err.response?.status === 403) {
+              setAuthError(true);
+              setError('You do not have permission to access this admin feature.');
+            } else {
+              setError('Failed to load database statistics: ' + (err.response?.data?.detail || err.message));
+            }
           }
         );
         
@@ -177,18 +216,18 @@ const DatabaseViewerContent = () => {
       } catch (err) {
         console.error('Error in fetchStats:', err);
         setError('Failed to process database statistics: ' + err.message);
-        setStats(null);
+        setStats({});
       } finally {
         setLoading(false);
       }
     };
 
     fetchStats();
-  }, []);
+  }, [user, getAccessToken]);
 
   // Fetch table data when selectedTable changes
   useEffect(() => {
-    if (!selectedTable) return;
+    if (!selectedTable || !user) return;
 
     const fetchTableData = async () => {
       setLoading(true);
@@ -199,27 +238,32 @@ const DatabaseViewerContent = () => {
         
         // Use the safeApiCall utility for better error handling
         const data = await safeApiCall(
-          () => axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
-          null, // Fallback to null if the API call fails
+          () => callWithAuth(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+          { columns: [], data: [] }, // Fallback to empty structure if the API call fails
           (err) => {
             // Custom error handling
             console.error(`Error fetching data for table ${selectedTable}:`, err);
-            setError(`Failed to load data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+            if (err.response?.status === 401 || err.response?.status === 403) {
+              setAuthError(true);
+              setError('You do not have permission to access this admin feature.');
+            } else {
+              setError(`Failed to load data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+            }
           }
         );
         
-        setTableData(data || null);
+        setTableData(data || { columns: [], data: [] });
       } catch (err) {
         console.error(`Error in fetchTableData for ${selectedTable}:`, err);
         setError(`Failed to process data for table ${selectedTable}: ` + err.message);
-        setTableData(null);
+        setTableData({ columns: [], data: [] });
       } finally {
         setLoading(false);
       }
     };
 
     fetchTableData();
-  }, [selectedTable, page, rowsPerPage]);
+  }, [selectedTable, page, rowsPerPage, user, getAccessToken]);
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -240,12 +284,17 @@ const DatabaseViewerContent = () => {
         try {
           // Use the safeApiCall utility for better error handling
           const data = await safeApiCall(
-            () => axios.get('/api/admin/database-stats'),
+            () => callWithAuth('/api/admin/database-stats'),
             {}, // Fallback to empty object if the API call fails
             (err) => {
               // Custom error handling
               console.error('Error refreshing database stats:', err);
-              setError('Failed to refresh database statistics: ' + (err.response?.data?.detail || err.message));
+              if (err.response?.status === 401 || err.response?.status === 403) {
+                setAuthError(true);
+                setError('You do not have permission to access this admin feature.');
+              } else {
+                setError('Failed to refresh database statistics: ' + (err.response?.data?.detail || err.message));
+              }
             }
           );
           
@@ -269,20 +318,25 @@ const DatabaseViewerContent = () => {
           
           // Use the safeApiCall utility for better error handling
           const data = await safeApiCall(
-            () => axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
-            null, // Fallback to null if the API call fails
+            () => callWithAuth(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+            { columns: [], data: [] }, // Fallback to empty structure if the API call fails
             (err) => {
               // Custom error handling
               console.error(`Error refreshing data for table ${selectedTable}:`, err);
-              setError(`Failed to refresh data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+              if (err.response?.status === 401 || err.response?.status === 403) {
+                setAuthError(true);
+                setError('You do not have permission to access this admin feature.');
+              } else {
+                setError(`Failed to refresh data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+              }
             }
           );
           
-          setTableData(data || null);
+          setTableData(data || { columns: [], data: [] });
         } catch (err) {
           console.error(`Error in refreshTableData for ${selectedTable}:`, err);
           setError(`Failed to process data for table ${selectedTable}: ` + err.message);
-          setTableData(null);
+          setTableData({ columns: [], data: [] });
         } finally {
           setLoading(false);
         }
@@ -354,7 +408,14 @@ const DatabaseViewerContent = () => {
         </Button>
       </Box>
 
-      {error && (
+      {authError && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <AlertTitle>Admin Access Required</AlertTitle>
+          You need administrator privileges to access this feature. Please contact your system administrator.
+        </Alert>
+      )}
+
+      {error && !authError && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
