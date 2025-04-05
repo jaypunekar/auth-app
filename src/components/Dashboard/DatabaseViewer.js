@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { safeApiCall, retryApiCall } from '../../utils/apiUtils';
 import {
   Box,
   Typography,
@@ -24,14 +25,55 @@ import {
   CardContent,
   Grid,
   Chip,
-  Divider
+  Divider,
+  Stack
 } from '@mui/material';
 import {
   Storage as StorageIcon,
   TableChart as TableIcon,
   Refresh as RefreshIcon,
-  BarChart as ChartIcon
+  BarChart as ChartIcon,
+  ErrorOutline as ErrorIcon
 } from '@mui/icons-material';
+
+// Error boundary component to catch rendering errors
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Error caught by DatabaseViewer ErrorBoundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Paper sx={{ p: 3, textAlign: 'center' }}>
+          <ErrorIcon color="error" sx={{ fontSize: 60, mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            Something went wrong displaying this component
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => this.setState({ hasError: false })}
+            sx={{ mt: 2 }}
+          >
+            Try Again
+          </Button>
+        </Paper>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Custom TabPanel component for the database viewer
 function TabPanel(props) {
@@ -54,7 +96,17 @@ function TabPanel(props) {
   );
 }
 
+// Wrapper component with error handling
 const DatabaseViewer = () => {
+  return (
+    <ErrorBoundary>
+      <DatabaseViewerContent />
+    </ErrorBoundary>
+  );
+};
+
+// Main component content
+const DatabaseViewerContent = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('');
@@ -68,20 +120,32 @@ const DatabaseViewer = () => {
   // Fetch list of table names
   useEffect(() => {
     const fetchTables = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
-        setLoading(true);
-        const response = await axios.get('/api/admin/table-names');
-        setTables(response.data);
+        // Use the safeApiCall utility for better error handling
+        const data = await safeApiCall(
+          () => axios.get('/api/admin/table-names'), 
+          [], // Fallback to empty array if the API call fails
+          (err) => {
+            // Custom error handling
+            console.error('Error fetching tables:', err);
+            setError('Failed to load database tables: ' + (err.response?.data?.detail || err.message));
+          }
+        );
+        
+        setTables(data || []);
         
         // Set the first table as the default
-        if (response.data.length > 0 && !selectedTable) {
-          setSelectedTable(response.data[0]);
+        if (data && data.length > 0 && !selectedTable) {
+          setSelectedTable(data[0]);
         }
-        
-        setLoading(false);
       } catch (err) {
-        console.error('Error fetching tables:', err);
-        setError('Failed to load database tables: ' + (err.response?.data?.detail || err.message));
+        console.error('Error in fetchTables:', err);
+        setError('Failed to process database tables: ' + err.message);
+        setTables([]);
+      } finally {
         setLoading(false);
       }
     };
@@ -92,14 +156,27 @@ const DatabaseViewer = () => {
   // Fetch database stats on mount
   useEffect(() => {
     const fetchStats = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
-        setLoading(true);
-        const response = await axios.get('/api/admin/database-stats');
-        setStats(response.data);
-        setLoading(false);
+        // Use the safeApiCall utility for better error handling
+        const data = await safeApiCall(
+          () => axios.get('/api/admin/database-stats'),
+          {}, // Fallback to empty object if the API call fails
+          (err) => {
+            // Custom error handling
+            console.error('Error fetching database stats:', err);
+            setError('Failed to load database statistics: ' + (err.response?.data?.detail || err.message));
+          }
+        );
+        
+        setStats(data || {});
       } catch (err) {
-        console.error('Error fetching database stats:', err);
-        setError('Failed to load database statistics: ' + (err.response?.data?.detail || err.message));
+        console.error('Error in fetchStats:', err);
+        setError('Failed to process database statistics: ' + err.message);
+        setStats(null);
+      } finally {
         setLoading(false);
       }
     };
@@ -112,15 +189,29 @@ const DatabaseViewer = () => {
     if (!selectedTable) return;
 
     const fetchTableData = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
-        setLoading(true);
         const offset = (page - 1) * rowsPerPage;
-        const response = await axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`);
-        setTableData(response.data);
-        setLoading(false);
+        
+        // Use the safeApiCall utility for better error handling
+        const data = await safeApiCall(
+          () => axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+          null, // Fallback to null if the API call fails
+          (err) => {
+            // Custom error handling
+            console.error(`Error fetching data for table ${selectedTable}:`, err);
+            setError(`Failed to load data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+          }
+        );
+        
+        setTableData(data || null);
       } catch (err) {
-        console.error(`Error fetching data for table ${selectedTable}:`, err);
-        setError(`Failed to load data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+        console.error(`Error in fetchTableData for ${selectedTable}:`, err);
+        setError(`Failed to process data for table ${selectedTable}: ` + err.message);
+        setTableData(null);
+      } finally {
         setLoading(false);
       }
     };
@@ -141,14 +232,26 @@ const DatabaseViewer = () => {
     if (activeTab === 0) {
       // Refresh stats
       const fetchStats = async () => {
+        setLoading(true);
+        setError(null);
+        
         try {
-          setLoading(true);
-          const response = await axios.get('/api/admin/database-stats');
-          setStats(response.data);
-          setLoading(false);
+          // Use the safeApiCall utility for better error handling
+          const data = await safeApiCall(
+            () => axios.get('/api/admin/database-stats'),
+            {}, // Fallback to empty object if the API call fails
+            (err) => {
+              // Custom error handling
+              console.error('Error refreshing database stats:', err);
+              setError('Failed to refresh database statistics: ' + (err.response?.data?.detail || err.message));
+            }
+          );
+          
+          setStats(data || {});
         } catch (err) {
-          console.error('Error refreshing database stats:', err);
-          setError('Failed to refresh database statistics: ' + (err.response?.data?.detail || err.message));
+          console.error('Error in refreshStats:', err);
+          setError('Failed to process database statistics: ' + err.message);
+        } finally {
           setLoading(false);
         }
       };
@@ -156,15 +259,29 @@ const DatabaseViewer = () => {
     } else {
       // Refresh table data
       const fetchTableData = async () => {
+        setLoading(true);
+        setError(null);
+        
         try {
-          setLoading(true);
           const offset = (page - 1) * rowsPerPage;
-          const response = await axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`);
-          setTableData(response.data);
-          setLoading(false);
+          
+          // Use the safeApiCall utility for better error handling
+          const data = await safeApiCall(
+            () => axios.get(`/api/admin/table-data/${selectedTable}?limit=${rowsPerPage}&offset=${offset}`),
+            null, // Fallback to null if the API call fails
+            (err) => {
+              // Custom error handling
+              console.error(`Error refreshing data for table ${selectedTable}:`, err);
+              setError(`Failed to refresh data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+            }
+          );
+          
+          setTableData(data || null);
         } catch (err) {
-          console.error(`Error refreshing data for table ${selectedTable}:`, err);
-          setError(`Failed to refresh data for table ${selectedTable}: ` + (err.response?.data?.detail || err.message));
+          console.error(`Error in refreshTableData for ${selectedTable}:`, err);
+          setError(`Failed to process data for table ${selectedTable}: ` + err.message);
+          setTableData(null);
+        } finally {
           setLoading(false);
         }
       };
@@ -193,11 +310,29 @@ const DatabaseViewer = () => {
             </Typography>
           </Box>
           <Typography variant="h4" component="div" sx={{ mt: 2, fontWeight: 'bold' }}>
-            {value}
+            {value !== undefined && value !== null ? value : 'N/A'}
           </Typography>
         </CardContent>
       </Card>
     </Grid>
+  );
+
+  // Fallback UI for when data fails to load
+  const renderFallbackUI = (message) => (
+    <Box sx={{ textAlign: 'center', py: 4 }}>
+      <ErrorIcon color="warning" sx={{ fontSize: 60, mb: 2 }} />
+      <Typography variant="h6" color="text.secondary" gutterBottom>
+        {message || 'Unable to load data'}
+      </Typography>
+      <Button 
+        variant="outlined" 
+        startIcon={<RefreshIcon />} 
+        onClick={handleRefresh}
+        sx={{ mt: 2 }}
+      >
+        Try Again
+      </Button>
+    </Box>
   );
 
   return (
@@ -237,7 +372,7 @@ const DatabaseViewer = () => {
       )}
 
       <TabPanel value={activeTab} index={0}>
-        {stats && !loading && (
+        {!loading && !error && stats && (
           <>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               {renderStatsCard('Total Users', stats.total_users, <ChartIcon color="primary" />)}
@@ -254,7 +389,7 @@ const DatabaseViewer = () => {
             <Divider sx={{ mb: 2 }} />
             
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {Object.entries(stats.subscription_breakdown).map(([status, count]) => (
+              {stats.subscription_breakdown && Object.entries(stats.subscription_breakdown).map(([status, count]) => (
                 <Chip 
                   key={status} 
                   label={`${status}: ${count}`} 
@@ -262,9 +397,13 @@ const DatabaseViewer = () => {
                   sx={{ fontSize: '1rem', py: 1 }}
                 />
               ))}
+              {(!stats.subscription_breakdown || Object.keys(stats.subscription_breakdown).length === 0) && (
+                <Typography color="text.secondary">No subscription data available</Typography>
+              )}
             </Box>
           </>
         )}
+        {!loading && !error && !stats && renderFallbackUI('No database statistics available')}
       </TabPanel>
 
       <TabPanel value={activeTab} index={1}>
@@ -277,6 +416,7 @@ const DatabaseViewer = () => {
               value={selectedTable}
               label="Select Table"
               onChange={handleTableChange}
+              disabled={tables.length === 0}
             >
               {tables.map((table) => (
                 <MenuItem key={table} value={table}>
@@ -287,11 +427,11 @@ const DatabaseViewer = () => {
           </FormControl>
         </Box>
 
-        {tableData && !loading && (
+        {!loading && !error && tableData && (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
-                {tableData.table_name} ({tableData.data.length} records shown)
+                {tableData.table_name} ({tableData.data && tableData.data.length ? tableData.data.length : 0} records shown)
               </Typography>
               <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
                 <InputLabel id="rows-per-page-label">Rows</InputLabel>
@@ -310,32 +450,36 @@ const DatabaseViewer = () => {
               </FormControl>
             </Box>
 
-            <TableContainer component={Paper} sx={{ maxHeight: 600, overflow: 'auto' }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    {tableData.columns.map((column) => (
-                      <TableCell key={column} sx={{ fontWeight: 'bold' }}>
-                        {column}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {tableData.data.map((row, rowIndex) => (
-                    <TableRow key={rowIndex} hover>
+            {tableData.data && tableData.data.length > 0 && tableData.columns ? (
+              <TableContainer component={Paper} sx={{ maxHeight: 600, overflow: 'auto' }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
                       {tableData.columns.map((column) => (
-                        <TableCell key={column}>
-                          {row[column] === null 
-                            ? <Typography variant="body2" color="text.secondary">null</Typography> 
-                            : String(row[column])}
+                        <TableCell key={column} sx={{ fontWeight: 'bold' }}>
+                          {column}
                         </TableCell>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {tableData.data.map((row, rowIndex) => (
+                      <TableRow key={rowIndex} hover>
+                        {tableData.columns.map((column) => (
+                          <TableCell key={column}>
+                            {row[column] === null 
+                              ? <Typography variant="body2" color="text.secondary">null</Typography> 
+                              : String(row[column])}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Alert severity="info" sx={{ my: 2 }}>No data available for this table</Alert>
+            )}
 
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
               <Pagination 
@@ -343,10 +487,13 @@ const DatabaseViewer = () => {
                 page={page} 
                 onChange={handlePageChange} 
                 color="primary" 
+                disabled={!tableData || !tableData.data || tableData.data.length === 0}
               />
             </Box>
           </>
         )}
+        {!loading && !error && (!tableData || !selectedTable) && renderFallbackUI('No table data available')}
+        {!loading && !error && tables.length === 0 && renderFallbackUI('No tables available to display')}
       </TabPanel>
     </Paper>
   );

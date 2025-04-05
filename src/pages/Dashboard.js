@@ -845,10 +845,64 @@ const Dashboard = () => {
       
       {/* Database Explorer tab */}
       <TabPanel value={activeTab} index={canUseGoogleAds ? 3 : 2}>
-        <DatabaseViewer />
+        <React.Suspense fallback={
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <CircularProgress />
+            <Typography variant="h6" sx={{ mt: 2 }}>
+              Loading Database Explorer...
+            </Typography>
+          </Box>
+        }>
+          <DashboardErrorBoundary>
+            <DatabaseViewer />
+          </DashboardErrorBoundary>
+        </React.Suspense>
       </TabPanel>
     </Container>
   );
 };
+
+// Define the error boundary component
+class DashboardErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Error caught in Dashboard ErrorBoundary:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card sx={{ p: 3, textAlign: 'center' }}>
+          <Box sx={{ mb: 2 }}>
+            <StorageIcon color="error" sx={{ fontSize: 60 }} />
+          </Box>
+          <Typography variant="h6" gutterBottom>
+            Database Explorer Failed to Load
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            There was an error loading the Database Explorer component. This could be due to connectivity issues or database access restrictions.
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => this.setState({ hasError: false })}
+          >
+            Try Again
+          </Button>
+        </Card>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default Dashboard; 
