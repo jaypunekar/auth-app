@@ -37,6 +37,9 @@ import {
   Lock as LockIcon,
   ContactSupport as ContactSupportIcon,
   StarBorder as StarBorderIcon,
+  Star as StarIcon,
+  LockOpen as LockOpenIcon,
+  Storage as StorageIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -82,6 +85,7 @@ const MainLayout = () => {
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
     { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },
     { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
+    { text: 'Database Explorer', icon: <StorageIcon />, path: '/database-explorer' },
   ];
 
   const drawer = (

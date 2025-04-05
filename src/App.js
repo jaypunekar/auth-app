@@ -24,6 +24,7 @@ import InstagramAnalyzer from './pages/InstagramAnalyzer';
 import FacebookAnalyzer from './pages/FacebookAnalyzer';
 import Subscriptions from './pages/Subscriptions';
 import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
+import DatabaseExplorer from './pages/DatabaseExplorer';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -76,6 +77,7 @@ function App() {
           <Route path="facebook-analyzer" element={<FacebookAnalyzer />} />
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="google-ads-funds-success" element={<GoogleAdsFundsSuccess />} />
+          <Route path="database-explorer" element={<DatabaseExplorer />} />
         </Route>
 
         {/* Redirect to login for any other route */}
