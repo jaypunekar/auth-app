@@ -16,6 +16,7 @@ const DatabaseViewer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tables, setTables] = useState([]);
+  const [filteredTables, setFilteredTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState('');
   const [tableData, setTableData] = useState(null);
   const [page, setPage] = useState(0);
@@ -24,6 +25,9 @@ const DatabaseViewer = () => {
   const [schema, setSchema] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [searchFilter, setSearchFilter] = useState('');
+
+  // List of tables to show in the database tab
+  const allowedTables = ['users', 'subscriptions'];
 
   const apiUrl = process.env.REACT_APP_API_URL || '/api';
 
@@ -45,11 +49,16 @@ const DatabaseViewer = () => {
     try {
       setLoading(true);
       const response = await axios.get(`${apiUrl}/database/tables`);
-      setTables(response.data.tables);
+      const allTables = response.data.tables;
+      setTables(allTables);
       
-      // Select the first table by default if available
-      if (response.data.tables && response.data.tables.length > 0) {
-        setSelectedTable(response.data.tables[0]);
+      // Filter tables for the database tab
+      const filtered = allTables.filter(table => allowedTables.includes(table));
+      setFilteredTables(filtered);
+      
+      // Select the first allowed table by default if available
+      if (filtered.length > 0) {
+        setSelectedTable(filtered[0]);
       }
       
       setError(null);
@@ -166,7 +175,9 @@ const DatabaseViewer = () => {
 
     return (
       <Box>
-        {Object.entries(schema).map(([tableName, tableSchema]) => (
+        {Object.entries(schema)
+          .filter(([tableName]) => allowedTables.includes(tableName))
+          .map(([tableName, tableSchema]) => (
           <Accordion key={tableName}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6">{tableName}</Typography>
@@ -239,7 +250,7 @@ const DatabaseViewer = () => {
       return (
         <Box sx={{ textAlign: 'center', p: 4 }}>
           <Typography variant="body1">
-            Select a table to view its data
+            {filteredTables.length > 0 ? 'Select a table to view its data' : 'No tables available to view'}
           </Typography>
         </Box>
       );
@@ -258,7 +269,7 @@ const DatabaseViewer = () => {
               label="Table"
               onChange={handleTableChange}
             >
-              {tables.map((table) => (
+              {filteredTables.map((table) => (
                 <MenuItem key={table} value={table}>{table}</MenuItem>
               ))}
             </Select>
