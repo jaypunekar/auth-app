@@ -6,11 +6,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
-import { initializeAxiosInterceptors } from './utils/apiUtils';
 import './index.css';
-
-// Initialize API error handling and interceptors
-initializeAxiosInterceptors();
 
 // Create a theme
 const theme = createTheme({

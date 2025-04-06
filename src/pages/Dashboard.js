@@ -42,8 +42,6 @@ import {
   Chat as ChatIcon,
   Star as StarIcon,
   LockOutlined as LockIcon,
-  Home as HomeIcon,
-  Storage as StorageIcon,
 } from '@mui/icons-material';
 import { adCampaignAPI, googleAdsAPI, feedbackAPI } from '../services/api';
 import AuthDebug from '../components/AuthDebug';
@@ -51,7 +49,6 @@ import ImageGenerator from '../components/ImageGeneration/ImageGenerator';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../context/AuthContext';
-import DatabaseViewer from '../components/Dashboard/DatabaseViewer';
 
 // Helper function to group campaigns by platform
 const groupCampaignsByPlatform = (campaigns) => {
@@ -785,124 +782,922 @@ const Dashboard = () => {
   const platforms = Object.keys(groupedCampaigns);
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 8 }}>
-      {/* Payment failure alert shown if applicable */}
-      {hasPaymentFailed && (
+    <Container>
+      {/* Payment Warning Alert */}
+      {hasPaymentFailed && subscription.tier === 'Pro' && (
         <Alert 
-          severity="warning" 
-          sx={{ mb: 3 }}
+          severity="error" 
+          sx={{ mb: 4 }}
           action={
-            subscription?.payment_url && (
-              <Button 
-                color="inherit" 
-                size="small" 
-                variant="outlined"
-                onClick={() => window.open(subscription.payment_url, '_blank')}
-              >
-                Update Payment
-              </Button>
-            )
+            <Button 
+              color="inherit" 
+              size="small" 
+              component={RouterLink} 
+              to="/subscriptions"
+            >
+              Update Payment
+            </Button>
           }
         >
-          <AlertTitle>Payment Failed</AlertTitle>
-          Your subscription payment has failed. Pro features will be disabled on {graceEndDate} unless payment is made.
+          <AlertTitle>Subscription Payment Failed</AlertTitle>
+          Your Pro subscription payment has failed. Pro features will be disabled on {graceEndDate}. Please update your payment method to continue using premium features.
         </Alert>
       )}
       
-      {/* The main content tabs */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Dashboard
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Manage your campaigns and analytics
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Dashboard
+        </Typography>
+        <Box>
+          {canCreateCampaign ? (
+        <Button
+              variant="contained"
+              color="primary"
+          component={RouterLink}
+          to="/campaigns/new"
+              startIcon={<AddIcon />}
+            >
+              Create Campaign
+            </Button>
+          ) : (
+            <Tooltip title="You've reached the maximum number of campaigns for your plan">
+              <span>
+                <Button
+          variant="contained"
+          color="primary"
+                  disabled
+          startIcon={<AddIcon />}
+        >
+                  Create Campaign
+        </Button>
+              </span>
+            </Tooltip>
+          )}
+          
+          {subscription?.tier === 'Free' && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              component={RouterLink}
+              to="/subscriptions"
+              startIcon={<StarIcon />}
+              sx={{ ml: 2 }}
+            >
+              Upgrade to Pro
+            </Button>
+          )}
+        </Box>
+      </Box>
+      
+      {!loading && campaigns.length === 0 && !error && (
+        <Alert
+          severity="info"
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              component={RouterLink}
+              to="/campaigns/new"
+            >
+              Create Campaign
+            </Button>
+          }
+          sx={{ mb: 4 }}
+        >
+          No campaigns found. Create your first ad campaign to get started!
+        </Alert>
+      )}
+      
+      {subscription?.tier === 'Free' && (
+        <Alert 
+          severity="info" 
+          sx={{ mb: 4 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              component={RouterLink}
+              to="/subscriptions"
+            >
+              Upgrade
+            </Button>
+          }
+        >
+          You're on the Free tier. Upgrade to Pro to access Google Ads integration and create up to 50 campaigns!
+        </Alert>
+      )}
+      
+      {maxCampaigns > 0 && (
+        <Box sx={{ mb: 4, display: 'flex', alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+            Campaign limit: {campaigns.length}/{maxCampaigns}
+          </Typography>
+          {campaignsRemaining <= 2 && (
+            <Chip 
+              label={`${campaignsRemaining} remaining`} 
+              size="small" 
+              color={campaignsRemaining === 0 ? "error" : "warning"} 
+            />
+          )}
+        </Box>
+      )}
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 4 }}>
+          {error}
+        </Alert>
+      )}
+      
       <Tabs 
         value={activeTab} 
         onChange={handleTabChange} 
-        indicatorColor="primary"
-        textColor="primary"
+        aria-label="dashboard tabs"
         sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Tab icon={<HomeIcon />} iconPosition="start" label="Campaigns" />
-        {canUseGoogleAds && (
-          <Tab icon={<GoogleIcon />} iconPosition="start" label="Google Ads" />
-        )}
-        <Tab icon={<ChatIcon />} iconPosition="start" label="Message History" />
-        <Tab icon={<StorageIcon />} iconPosition="start" label="Database Explorer" />
-        {/* Add more tabs here as needed */}
+        <Tab label="Your Campaigns" />
+        <Tab label="Google Ads" />
+        <Tab label="AI Image Generation" icon={<ImageIcon />} iconPosition="start" />
+        <Tab label="Response Review" icon={<ChatIcon />} iconPosition="start" />
       </Tabs>
       
-      {/* Campaigns tab */}
       <TabPanel value={activeTab} index={0}>
-        {/* ... existing content ... */}
-      </TabPanel>
-      
-      {/* Google Ads tab (conditionally shown) */}
-      {canUseGoogleAds && (
-        <TabPanel value={activeTab} index={1}>
-          {/* ... existing content ... */}
-        </TabPanel>
-      )}
-      
-      {/* Message History tab */}
-      <TabPanel value={activeTab} index={canUseGoogleAds ? 2 : 1}>
-        {/* ... existing content ... */}
-      </TabPanel>
-      
-      {/* Database Explorer tab */}
-      <TabPanel value={activeTab} index={canUseGoogleAds ? 3 : 2}>
-        <React.Suspense fallback={
-          <Box sx={{ textAlign: 'center', py: 4 }}>
+        {/* Your Campaigns Tab Content */}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
             <CircularProgress />
-            <Typography variant="h6" sx={{ mt: 2 }}>
-              Loading Database Explorer...
-            </Typography>
           </Box>
-        }>
-          <DashboardErrorBoundary>
-            <DatabaseViewer />
-          </DashboardErrorBoundary>
-        </React.Suspense>
+        ) : campaigns.length === 0 ? (
+          <Box sx={{ mt: 3, textAlign: 'center' }}>
+            <Typography variant="body1" color="textSecondary" gutterBottom>
+              You don't have any campaigns yet.
+            </Typography>
+            <Button
+              component={RouterLink}
+              to="/campaigns/new"
+              variant="contained"
+              color="primary"
+              sx={{ mt: 2 }}
+              startIcon={<AddIcon />}
+            >
+              Create Your First Campaign
+            </Button>
+          </Box>
+        ) : (
+          // Your existing campaign list UI
+          <Box>
+            {/* Group campaigns by platform */}
+            {Object.entries(groupCampaignsByPlatform(campaigns)).map(([platform, platformCampaigns]) => (
+              <Box key={platform} sx={{ mb: 4 }}>
+                <Typography variant="h6" gutterBottom>
+                  {platform} Campaigns
+                </Typography>
+                <Grid container spacing={3}>
+                  {platformCampaigns.map((campaign) => (
+                    <Grid item xs={12} sm={6} md={4} key={campaign.id}>
+                      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        {campaign.image_url ? (
+                          <CardMedia
+                            component="img"
+                            height="140"
+                            image={campaign.image_url}
+                            alt={campaign.title}
+                          />
+                        ) : (
+                          <Box sx={{ height: 140, bgcolor: 'rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ImageIcon color="disabled" fontSize="large" />
+                          </Box>
+                        )}
+                        <CardContent sx={{ flexGrow: 1 }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Typography variant="h6" component="div" noWrap sx={{ flexGrow: 1 }}>
+                              {campaign.title}
+                            </Typography>
+                            <Chip 
+                              label={campaign.status} 
+                              size="small" 
+                              color={getStatusColor(campaign.status)}
+                              sx={{ ml: 1 }}
+                            />
+                          </Box>
+                          <Typography variant="body2" color="text.secondary">
+                            {campaign.description?.substring(0, 100)}
+                            {campaign.description?.length > 100 ? '...' : ''}
+                          </Typography>
+                          {campaign.budget && (
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                              Budget: ${campaign.budget} {campaign.budget_type}
+                            </Typography>
+                          )}
+                        </CardContent>
+                        <CardActions>
+                          <Button 
+                            size="small" 
+                            component={RouterLink} 
+                            to={`/campaigns/${campaign.id}`}
+                          >
+                            View Details
+                          </Button>
+                          <Button 
+                            size="small" 
+                            component={RouterLink} 
+                            to={`/campaigns/edit/${campaign.id}`}
+                            startIcon={<EditIcon />}
+                          >
+                            Edit
+                          </Button>
+                        </CardActions>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              </Box>
+            ))}
+          </Box>
+        )}
       </TabPanel>
+      
+      <TabPanel value={activeTab} index={1}>
+        {!canUseGoogleAds ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Box sx={{ mb: 2 }}>
+              <LockIcon fontSize="large" color="action" />
+            </Box>
+            <Typography variant="h6" gutterBottom>
+              Google Ads Integration is a Pro Feature
+            </Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              Upgrade to Pro tier to connect your Google Ads account and manage campaigns directly.
+            </Typography>
+            <Button
+              variant="contained"
+              color="secondary"
+              component={RouterLink}
+              to="/subscriptions"
+              startIcon={<StarIcon />}
+            >
+              Upgrade to Pro
+            </Button>
+          </Box>
+        ) : (
+          <>
+        {googleAdsError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {googleAdsError}
+          </Alert>
+        )}
+
+        {googleAdsLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : googleAdsCampaigns.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h6" color="text.secondary" gutterBottom>
+              No Google Ads campaigns found
+            </Typography>
+            <Typography variant="body1" color="text.secondary" paragraph>
+              Create your first Google Ads campaign to get started
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<GoogleIcon />}
+              component={RouterLink}
+              to="/google-ads/new"
+            >
+              Create Google Ads Campaign
+            </Button>
+          </Box>
+        ) : (
+          <Box sx={{ mt: 3 }}>
+            <Grid container spacing={3}>
+              {googleAdsCampaigns.map((campaign) => (
+                <Grid item xs={12} sm={6} md={4} key={campaign.id}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography variant="h6" component="div" noWrap gutterBottom>
+                        {campaign.name}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <Chip
+                          label={campaign.status}
+                          size="small"
+                          color={getStatusColor(campaign.status)}
+                          variant="outlined"
+                          sx={{ mr: 1 }}
+                        />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        {campaign.channel_type || campaign.campaignType || 'Search Campaign'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Budget: ${campaign.budget}/day
+                      </Typography>
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Start Date:</strong> {formatCampaignDate(campaign.startDate || campaign.start_date || campaign.start_date_raw)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>End Date:</strong> {formatCampaignDate(campaign.endDate || campaign.end_date || campaign.end_date_raw)}
+                        </Typography>
+                      </Box>
+                          
+                          <Button
+                            fullWidth
+                            variant="outlined"
+                            color="primary"
+                            sx={{ mt: 2 }}
+                            onClick={() => handleViewResponsiveAds(campaign.id)}
+                          >
+                            View & Edit Ads
+                          </Button>
+                    </CardContent>
+                    <CardActions>
+                      <Button
+                        size="small"
+                        startIcon={<UpdateIcon />}
+                        onClick={() => handleUpdateCampaign(campaign)}
+                      >
+                        Update
+                      </Button>
+                      <Button
+                        size="small"
+                        color="error"
+                        startIcon={<DeleteIcon />}
+                        onClick={() => handleOpenDeleteDialog(campaign)}
+                      >
+                        Delete
+                      </Button>
+                    </CardActions>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+            )}
+          </>
+        )}
+      </TabPanel>
+      
+      <TabPanel value={activeTab} index={2}>
+        {/* AI Image Generation Tab Content */}
+        <ImageGenerator />
+      </TabPanel>
+      
+      <TabPanel value={activeTab} index={3}>
+        {/* Response Review Tab Content */}
+        {feedbackError && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {feedbackError}
+          </Alert>
+        )}
+        
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+          <Tabs value={reviewTab} onChange={handleReviewTabChange} aria-label="feedback tabs">
+            <Tab 
+              label="Liked Responses" 
+              icon={<ThumbUpIcon />} 
+              iconPosition="start" 
+            />
+            <Tab 
+              label="Disliked Responses" 
+              icon={<ThumbDownIcon />} 
+              iconPosition="start" 
+            />
+          </Tabs>
+        </Box>
+        
+        {loadingFeedback ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {/* Liked Responses */}
+            <TabPanel value={reviewTab} index={0}>
+              {likedResponses.length === 0 ? (
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                  <Typography variant="body1" color="textSecondary" gutterBottom>
+                    You haven't liked any responses yet.
+                  </Typography>
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  {likedResponses.map((feedback) => (
+                    <Grid item xs={12} key={feedback.id}>
+                      <Card sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center' }}>
+                            <ThumbUpIcon color="success" sx={{ mr: 1 }} />
+                            Helpful Response
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(feedback.created_at).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Divider sx={{ mb: 2 }} />
+                        <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {feedback.message?.content || 'Content not available'}
+                          </ReactMarkdown>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button 
+                            variant="outlined" 
+                            color="error" 
+                            size="small"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleRemoveFeedback(feedback.id)}
+                          >
+                            Remove Feedback
+                          </Button>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </TabPanel>
+            
+            {/* Disliked Responses */}
+            <TabPanel value={reviewTab} index={1}>
+              {dislikedResponses.length === 0 ? (
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                  <Typography variant="body1" color="textSecondary" gutterBottom>
+                    You haven't disliked any responses yet.
+                  </Typography>
+                </Box>
+              ) : (
+                <Grid container spacing={3}>
+                  {dislikedResponses.map((feedback) => (
+                    <Grid item xs={12} key={feedback.id}>
+                      <Card sx={{ p: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center' }}>
+                            <ThumbDownIcon color="error" sx={{ mr: 1 }} />
+                            Unhelpful Response
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(feedback.created_at).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        <Divider sx={{ mb: 2 }} />
+                        <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {feedback.message?.content || 'Content not available'}
+                          </ReactMarkdown>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <Button 
+                            variant="outlined" 
+                            color="error" 
+                            size="small"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => handleRemoveFeedback(feedback.id)}
+                          >
+                            Remove Feedback
+                          </Button>
+                        </Box>
+                      </Card>
+                    </Grid>
+                  ))}
+                </Grid>
+              )}
+            </TabPanel>
+          </>
+        )}
+      </TabPanel>
+      
+      {/* Update Campaign Dialog */}
+      <Dialog open={updateDialogOpen} onClose={handleUpdateDialogClose} maxWidth="sm" fullWidth>
+        <DialogTitle>Update Campaign</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              label="Campaign Name"
+              fullWidth
+              margin="normal"
+              value={updatedCampaignData.name}
+              onChange={(e) => handleUpdateFieldChange('name', e.target.value)}
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={updatedCampaignData.status}
+                label="Status"
+                onChange={(e) => handleUpdateFieldChange('status', e.target.value)}
+              >
+                <MenuItem value="ENABLED">Enabled</MenuItem>
+                <MenuItem value="PAUSED">Paused</MenuItem>
+                <MenuItem value="REMOVED">Removed</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              label="Daily Budget ($)"
+              fullWidth
+              margin="normal"
+              type="number"
+              inputProps={{ min: 1, step: 0.01 }}
+              value={updatedCampaignData.daily_budget}
+              onChange={(e) => handleUpdateFieldChange('daily_budget', e.target.value)}
+            />
+            
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="Start Date (YYYY-MM-DD)"
+                  fullWidth
+                  margin="normal"
+                  value={updatedCampaignData.startDate}
+                  disabled={true}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  placeholder="YYYY-MM-DD"
+                  helperText="Start date cannot be modified once campaign has started"
+                />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  label="End Date (YYYY-MM-DD)"
+                  fullWidth
+                  margin="normal"
+                  value={updatedCampaignData.endDate}
+                  onChange={(e) => handleUpdateFieldChange('endDate', e.target.value)}
+                  placeholder="YYYY-MM-DD"
+                  helperText="Leave empty for campaigns with no end date"
+                />
+              </Grid>
+            </Grid>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleUpdateDialogClose}>Cancel</Button>
+          <Button 
+            onClick={handleTestDirectUpdate} 
+            color="secondary" 
+            sx={{ mr: 1 }}
+            disabled={isUpdating}
+          >
+            Test Direct Update
+          </Button>
+          <Button 
+            onClick={handleSubmitUpdate} 
+            variant="contained" 
+            color="primary"
+            disabled={isUpdating}
+          >
+            Update
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+
+      {/* Responsive Search Ads Dialog */}
+      <Dialog
+        open={responsiveAdsDialogOpen}
+        onClose={handleResponsiveAdsDialogClose}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          {selectedCampaign ? `Responsive Search Ads - ${selectedCampaign.name}` : 'Responsive Search Ads'}
+        </DialogTitle>
+        <DialogContent>
+          {loadingResponsiveAds ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : responsiveAds.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1">No responsive search ads found for this campaign.</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ mt: 2 }}>
+              {responsiveAds.map((ad) => (
+                <Card key={ad.id} sx={{ mb: 3, p: 2 }}>
+                  <Typography variant="h6">Ad ID: {ad.id}</Typography>
+                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    Status: {ad.status}
+                  </Typography>
+                  
+                  <Typography variant="body1" sx={{ mt: 2, fontWeight: 'bold' }}>Headlines:</Typography>
+                  <Box sx={{ ml: 2 }}>
+                    {ad.headlines.map((headline, index) => (
+                      <Typography key={index} variant="body2">
+                        {index + 1}. {headline.text} 
+                        {headline.pinnedField && (
+                          <Chip 
+                            label={`Pinned to ${headline.pinnedField}`} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined" 
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Typography>
+                    ))}
+                  </Box>
+                  
+                  <Typography variant="body1" sx={{ mt: 2, fontWeight: 'bold' }}>Descriptions:</Typography>
+                  <Box sx={{ ml: 2 }}>
+                    {ad.descriptions.map((description, index) => (
+                      <Typography key={index} variant="body2">
+                        {index + 1}. {description.text}
+                        {description.pinnedField && (
+                          <Chip 
+                            label={`Pinned to ${description.pinnedField}`} 
+                            size="small" 
+                            color="primary" 
+                            variant="outlined" 
+                            sx={{ ml: 1 }}
+                          />
+                        )}
+                      </Typography>
+                    ))}
+                  </Box>
+                  
+                  {ad.finalUrl && (
+                    <Typography variant="body2" sx={{ mt: 2 }}>
+                      <strong>Final URL:</strong> {ad.finalUrl}
+                    </Typography>
+                  )}
+                  
+                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={() => handleUpdateAd(ad)}
+                    >
+                      Update Ad
+                    </Button>
+                  </Box>
+                </Card>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleResponsiveAdsDialogClose}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Responsive Search Ad Update Dialog */}
+      <Dialog
+        open={responsiveAdUpdateDialogOpen}
+        onClose={handleUpdateAdDialogClose}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Update Responsive Search Ad</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Google Ads requires a minimum of 3 headlines and 2 descriptions for responsive search ads.
+              The system will mix and match your headlines and descriptions to find the best performing combinations.
+            </Typography>
+            
+            <Typography variant="h6" gutterBottom>Headlines</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add 3-15 headlines (min 3, max 15). Each headline can be up to 30 characters.
+            </Typography>
+            {updatedAdData.headlines.map((headline, index) => (
+              <TextField
+                key={index}
+                label={`Headline ${index + 1}`}
+                value={headline.text || ''}
+                onChange={(e) => {
+                  const newHeadlines = [...updatedAdData.headlines];
+                  newHeadlines[index] = { ...headline, text: e.target.value };
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    headlines: newHeadlines
+                  });
+                }}
+                fullWidth
+                margin="normal"
+                helperText={headline.pinnedField ? `Pinned to ${headline.pinnedField}` : `${headline.text ? headline.text.length : 0}/30 characters`}
+                error={headline.text && headline.text.length > 30}
+                InputProps={{
+                  endAdornment: (
+                    <Typography variant="caption" color={headline.text && headline.text.length > 30 ? "error" : "text.secondary"}>
+                      {headline.text ? headline.text.length : 0}/30
+                    </Typography>
+                  )
+                }}
+              />
+            ))}
+            
+            {updatedAdData.headlines.length < 15 && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                sx={{ mt: 1, mb: 3 }}
+                onClick={() => {
+                  const newHeadlines = [...updatedAdData.headlines, { text: '', pinnedField: null }];
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    headlines: newHeadlines
+                  });
+                }}
+              >
+                + Add Another Headline
+              </Button>
+            )}
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Descriptions</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Add 2-4 descriptions (min 2, max 4). Each description can be up to 90 characters.
+            </Typography>
+            {updatedAdData.descriptions.map((description, index) => (
+              <TextField
+                key={index}
+                label={`Description ${index + 1}`}
+                value={description.text || ''}
+                onChange={(e) => {
+                  const newDescriptions = [...updatedAdData.descriptions];
+                  newDescriptions[index] = { ...description, text: e.target.value };
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    descriptions: newDescriptions
+                  });
+                }}
+                fullWidth
+                margin="normal"
+                multiline
+                rows={2}
+                helperText={description.pinnedField ? `Pinned to ${description.pinnedField}` : `${description.text ? description.text.length : 0}/90 characters`}
+                error={description.text && description.text.length > 90}
+                InputProps={{
+                  endAdornment: (
+                    <Typography variant="caption" color={description.text && description.text.length > 90 ? "error" : "text.secondary"}>
+                      {description.text ? description.text.length : 0}/90
+                    </Typography>
+                  )
+                }}
+              />
+            ))}
+            
+            {updatedAdData.descriptions.length < 4 && (
+              <Button 
+                variant="outlined" 
+                size="small" 
+                sx={{ mt: 1, mb: 3 }}
+                onClick={() => {
+                  const newDescriptions = [...updatedAdData.descriptions, { text: '', pinnedField: null }];
+                  setUpdatedAdData({
+                    ...updatedAdData,
+                    descriptions: newDescriptions
+                  });
+                }}
+              >
+                + Add Another Description
+              </Button>
+            )}
+            
+            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Final URL</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              This is the landing page users will go to when they click your ad.
+            </Typography>
+            <TextField
+              label="Final URL"
+              value={updatedAdData.finalUrl || ''}
+              onChange={(e) => {
+                setUpdatedAdData({
+                  ...updatedAdData,
+                  finalUrl: e.target.value
+                });
+              }}
+              fullWidth
+              margin="normal"
+              placeholder="https://www.example.com"
+              helperText="Make sure your URL includes http:// or https://"
+            />
+            
+            <Box sx={{ mt: 3, mb: 2, p: 2, bgcolor: 'rgba(0, 0, 0, 0.04)', borderRadius: 1 }}>
+              <Typography variant="h6" gutterBottom>Ad Preview</Typography>
+              
+              <Box sx={{ 
+                mb: 2, 
+                p: 2, 
+                border: '1px solid #ddd', 
+                borderRadius: 1, 
+                backgroundColor: '#fff',
+                maxWidth: '600px'
+              }}>
+                {/* URL in green */}
+                <Typography variant="body2" sx={{ color: '#1a0dab', fontSize: '16px', fontWeight: 'bold' }}>
+                  {updatedAdData.headlines[0]?.text || '[Headline 1]'}
+                </Typography>
+                
+                {/* Display URL in green */}
+                <Typography variant="body2" sx={{ color: '#006621', fontSize: '14px' }}>
+                  {updatedAdData.finalUrl ? updatedAdData.finalUrl.replace(/^https?:\/\//i, '') : 'www.example.com'}
+                </Typography>
+                
+                {/* Ad copy */}
+                <Typography variant="body2" sx={{ color: '#545454', fontSize: '14px', mt: 0.5 }}>
+                  {updatedAdData.descriptions[0]?.text || '[Description 1]'}
+                </Typography>
+                
+                {/* Additional headlines */}
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', mt: 1, gap: 1 }}>
+                  {updatedAdData.headlines.slice(1, 4).map((headline, index) => (
+                    headline.text ? (
+                      <Typography key={index} variant="body2" sx={{ 
+                        color: '#1a0dab',
+                        fontSize: '14px',
+                        '&:not(:last-child)::after': {
+                          content: '"|"',
+                          color: '#70757a',
+                          marginLeft: '4px',
+                          marginRight: '4px'
+                        }
+                      }}>
+                        {headline.text}
+                      </Typography>
+                    ) : null
+                  ))}
+                </Box>
+              </Box>
+              
+              <Typography variant="caption" color="text.secondary">
+                This is a simplified preview. Google Ads will automatically test different combinations of your headlines and descriptions.
+              </Typography>
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleUpdateAdDialogClose}>Cancel</Button>
+          <Button 
+            onClick={handleSubmitAdUpdate} 
+            variant="contained"
+            disabled={
+              updatedAdData.headlines.filter(h => h.text && h.text.trim()).length < 3 || 
+              updatedAdData.descriptions.filter(d => d.text && d.text.trim()).length < 2 ||
+              !updatedAdData.finalUrl ||
+              updatedAdData.headlines.some(h => h.text && h.text.length > 30) ||
+              updatedAdData.descriptions.some(d => d.text && d.text.length > 90) ||
+              updatingAd
+            }
+            startIcon={updatingAd && <CircularProgress size={20} />}
+          >
+            {updatingAd ? 'Updating...' : 'Update Ad'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
+        <DialogTitle>Delete Campaign</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete the campaign "{campaignToDelete?.name}"? 
+            This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={deletingCampaign}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleDeleteCampaign} 
+            color="error" 
+            disabled={deletingCampaign}
+            startIcon={deletingCampaign ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {deletingCampaign ? 'Deleting...' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add the AuthDebug component */}
+      <AuthDebug />
     </Container>
   );
 };
-
-// Define the error boundary component
-class DashboardErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error("Error caught in Dashboard ErrorBoundary:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Card sx={{ p: 3, textAlign: 'center' }}>
-          <Box sx={{ mb: 2 }}>
-            <StorageIcon color="error" sx={{ fontSize: 60 }} />
-          </Box>
-          <Typography variant="h6" gutterBottom>
-            Database Explorer Failed to Load
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            There was an error loading the Database Explorer component. This could be due to connectivity issues or database access restrictions.
-          </Typography>
-          <Button 
-            variant="contained" 
-            color="primary" 
-            onClick={() => this.setState({ hasError: false })}
-          >
-            Try Again
-          </Button>
-        </Card>
-      );
-    }
-
-    return this.props.children;
-  }
-}
 
 export default Dashboard; 
