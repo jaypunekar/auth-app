@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { useAuth } from './context/AuthContext';
+import { lazy, Suspense } from 'react';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -24,6 +25,7 @@ import InstagramAnalyzer from './pages/InstagramAnalyzer';
 import FacebookAnalyzer from './pages/FacebookAnalyzer';
 import Subscriptions from './pages/Subscriptions';
 import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
+import DatabaseViewer from './pages/DatabaseViewer';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -76,6 +78,7 @@ function App() {
           <Route path="facebook-analyzer" element={<FacebookAnalyzer />} />
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="google-ads-funds-success" element={<GoogleAdsFundsSuccess />} />
+          <Route path="database-viewer" element={<DatabaseViewer />} />
         </Route>
 
         {/* Redirect to login for any other route */}
