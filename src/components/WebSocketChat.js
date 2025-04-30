@@ -75,215 +75,218 @@ const WebSocketChat = () => {
   useEffect(() => {
     if (!token) return;
 
-    // Determine WebSocket protocol and URL based on current environment
+    // Create WebSocket connection with proper protocol detection
+    // Determine if we should use secure WebSockets (wss://) based on current protocol
     const isSecure = window.location.protocol === 'https:';
     const wsProtocol = isSecure ? 'wss://' : 'ws://';
+    const defaultWsUrl = isSecure ? 'wss://dev.adtask.ai' : 'ws://localhost:8000';
     
-    // For local development, use localhost with /api prefix
-    // For production, try both with and without /api prefix
-    let baseWsUrl;
-    if (window.location.hostname === 'localhost') {
-      // Local development
-      baseWsUrl = `${process.env.REACT_APP_WS_URL || `${wsProtocol}localhost:8000`}`;
-    } else {
-      // Production environment - use the same hostname as the current page
-      baseWsUrl = `${wsProtocol}${window.location.hostname}`;
-    }
-    
-    // First try with /api prefix (standard)
-    const wsUrl = `${baseWsUrl}/api/ws-chat/ws/${token}`;
+    const wsUrl = `${process.env.REACT_APP_WS_URL || defaultWsUrl}/api/ws-chat/ws/${token}`;
     console.log('Attempting WebSocket connection to:', wsUrl);
     
-    let connectionAttempted = false;
-    
-    const connectWebSocket = (url) => {
-      try {
-        console.log(`Attempting connection to: ${url}`);
-        connectionAttempted = true;
-        const ws = new WebSocket(url);
-        webSocketRef.current = ws;
+    try {
+      const ws = new WebSocket(wsUrl);
+      webSocketRef.current = ws;
+
+      // Connection opened
+      ws.onopen = () => {
+        console.log('WebSocket Connected Successfully');
+        setConnected(true);
         
-        // Connection opened
-        ws.onopen = () => {
-          console.log('WebSocket Connected Successfully');
-          setConnected(true);
+        // Initialize sessions array with an empty array if it's undefined
+        if (!sessions || sessions.length === 0) {
+          setSessions([]);
+          // Request previous sessions automatically
+          setIsLoadingPrevious(true);
+          fetchPreviousSessions();
+        }
+      };
+
+      // Add connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.error('WebSocket connection timed out');
+          setConnected(false);
           
-          // Initialize sessions array with an empty array if it's undefined
-          if (!sessions || sessions.length === 0) {
-            setSessions([]);
-            // Request previous sessions automatically
-            setIsLoadingPrevious(true);
-            fetchPreviousSessions();
+          // Add error message for users
+          setSessions(prev => {
+            if (!prev || prev.length === 0) {
+              return [{
+                sessionId: 'error-session',
+                name: 'Connection Error',
+                messages: [{
+                  role: 'system',
+                  content: 'Could not connect to the chat server. This might be due to network issues or server maintenance. Please try refreshing the page or try again later.'
+                }],
+                isError: true
+              }];
+            }
+            return prev;
+          });
+        }
+      }, 10000); // 10 second timeout
+      
+      // Listen for messages
+      ws.onmessage = (event) => {
+        try {
+          console.log('Raw WebSocket message received:', event.data);
+          let data;
+          
+          try {
+            data = JSON.parse(event.data);
+          } catch (parseError) {
+            console.error('Error parsing WebSocket message:', parseError);
+            console.log('Attempting to handle as non-JSON message');
+            data = { type: 'text', content: event.data };
           }
-        };
-        
-        // Connection error
-        ws.onerror = (error) => {
-          console.error('WebSocket connection error:', error);
           
-          // If this is the first attempt with /api prefix, try without prefix
-          if (url.includes('/api/') && !connectionAttempted) {
-            console.log('First connection attempt failed, trying without /api prefix...');
-            const altUrl = url.replace('/api/', '/');
-            console.log('Alternative URL:', altUrl);
-            setTimeout(() => connectWebSocket(altUrl), 1000);
+          console.log('Parsed WebSocket message:', data);
+          
+          // Handle previous_sessions message
+          if (data.type === 'previous_sessions') {
+            console.log('Received previous sessions:', data.content);
+            handlePreviousSessions(data.content);
             return;
           }
           
-          if (token) {
-            console.log('Token used for connection (first 10 chars):', token.substring(0, 10) + '...');
-          } else {
-            console.error('No authentication token available!');
+          // Handle session_continued message
+          if (data.type === 'session_continued') {
+            console.log('Received session_continued message:', data.content);
+            handleSessionContinued(data.content);
+            return;
           }
-          setConnected(false);
-        };
-        
-        // Listen for messages
-        ws.onmessage = (event) => {
-          try {
-            console.log('Raw WebSocket message received:', event.data);
-            let data;
-            
-            try {
-              data = JSON.parse(event.data);
-            } catch (parseError) {
-              console.error('Error parsing WebSocket message:', parseError);
-              console.log('Attempting to handle as non-JSON message');
-              data = { type: 'text', content: event.data };
-            }
-            
-            console.log('Parsed WebSocket message:', data);
-            
-            // Handle previous_sessions message
-            if (data.type === 'previous_sessions') {
-              console.log('Received previous sessions:', data.content);
-              handlePreviousSessions(data.content);
-              return;
-            }
-            
-            // Handle session_continued message
-            if (data.type === 'session_continued') {
-              console.log('Received session_continued message:', data.content);
-              handleSessionContinued(data.content);
-              return;
-            }
-            
-            // Handle session_created specially as it doesn't have a session ID yet
-            if (data.type === 'session_created') {
-              console.log('Received session_created message, calling handleSessionCreated');
-              handleSessionCreated(data);
-              return;
-            }
+          
+          // Handle session_created specially as it doesn't have a session ID yet
+          if (data.type === 'session_created') {
+            console.log('Received session_created message, calling handleSessionCreated');
+            handleSessionCreated(data);
+            return;
+          }
 
-            // Check if this is a stream message with embedded session_id
-            if (data.word && data.session_id) {
-              console.log('Received streaming word with session_id:', data.session_id);
-              // Convert to our internal message format
-              data = {
-                type: 'stream',
-                content: data.word,
-                session_id: data.session_id
-              };
-            }
+          // Check if this is a stream message with embedded session_id
+          if (data.word && data.session_id) {
+            console.log('Received streaming word with session_id:', data.session_id);
+            // Convert to our internal message format
+            data = {
+              type: 'stream',
+              content: data.word,
+              session_id: data.session_id
+            };
+          }
 
-            // We need to track which session responses belong to
-            // First look for session_id in the message itself
-            const messageType = data.type || '';
-            let sessionId = data.session_id || '';
-            
-            // If the message doesn't have a session_id but we have a typing session, associate with it
-            if (!sessionId && lastSessionIdRef.current['typing_session']) {
-              // For stream-related messages, associate with the active typing session
-              if (['stream', 'stream_end'].includes(messageType)) {
-                sessionId = lastSessionIdRef.current['typing_session'];
-                console.log(`No session_id in ${messageType} message, using typing session: ${sessionId}`);
+          // We need to track which session responses belong to
+          // First look for session_id in the message itself
+          const messageType = data.type || '';
+          let sessionId = data.session_id || '';
+          
+          // If the message doesn't have a session_id but we have a typing session, associate with it
+          if (!sessionId && lastSessionIdRef.current['typing_session']) {
+            // For stream-related messages, associate with the active typing session
+            if (['stream', 'stream_end'].includes(messageType)) {
+              sessionId = lastSessionIdRef.current['typing_session'];
+              console.log(`No session_id in ${messageType} message, using typing session: ${sessionId}`);
+            }
+          }
+          
+          // If still no session ID, try the previous message type associations
+          if (!sessionId && messageType) {
+            // For message types like 'processing_started', 'stream', 'stream_end' that are part of a conversation
+            if (['processing_started', 'stream', 'stream_end', 'error', 'additional_data'].includes(messageType)) {
+              // Use the last known session ID for this message type
+              sessionId = lastSessionIdRef.current[messageType];
+              if (sessionId) {
+                console.log(`Using last known ID for type ${messageType}: ${sessionId}`);
               }
             }
-            
-            // If still no session ID, try the previous message type associations
-            if (!sessionId && messageType) {
-              // For message types like 'processing_started', 'stream', 'stream_end' that are part of a conversation
-              if (['processing_started', 'stream', 'stream_end', 'error', 'additional_data'].includes(messageType)) {
-                // Use the last known session ID for this message type
-                sessionId = lastSessionIdRef.current[messageType];
-                if (sessionId) {
-                  console.log(`Using last known ID for type ${messageType}: ${sessionId}`);
-                }
-              }
-            }
-            
-            // Last resort: use current active session
-            if (!sessionId && activeSession?.sessionId) {
-              sessionId = activeSession.sessionId;
-              console.log(`No session ID found in message or tracking, using active session: ${sessionId}`);
-            }
-            
-            // Save this session ID for future messages of this type
-            if (sessionId && messageType) {
-              lastSessionIdRef.current[messageType] = sessionId;
-              console.log(`Saved ${sessionId} as last ID for message type ${messageType}`);
-            }
-            
-            // Add the session_id to the message object for downstream handling
-            data.session_id = sessionId;
-            
-            // Extract session_id from the response if available
-            if (sessionId) {
-              // Find the session with matching ID
-              console.log(`Looking for session with ID: ${sessionId}`);
-              setSessions(prevSessions => {
-                // Find the session with this ID
-                const sessionIndex = prevSessions.findIndex(s => s.sessionId === sessionId);
+          }
+          
+          // Last resort: use current active session
+          if (!sessionId && activeSession?.sessionId) {
+            sessionId = activeSession.sessionId;
+            console.log(`No session ID found in message or tracking, using active session: ${sessionId}`);
+          }
+          
+          // Save this session ID for future messages of this type
+          if (sessionId && messageType) {
+            lastSessionIdRef.current[messageType] = sessionId;
+            console.log(`Saved ${sessionId} as last ID for message type ${messageType}`);
+          }
+          
+          // Add the session_id to the message object for downstream handling
+          data.session_id = sessionId;
+          
+          // Extract session_id from the response if available
+          if (sessionId) {
+            // Find the session with matching ID
+            console.log(`Looking for session with ID: ${sessionId}`);
+            setSessions(prevSessions => {
+              // Find the session with this ID
+              const sessionIndex = prevSessions.findIndex(s => s.sessionId === sessionId);
+              
+              if (sessionIndex !== -1) {
+                console.log(`Found session at index ${sessionIndex} for session_id ${sessionId}`);
+                // Create a new array to avoid modifying state directly
+                const updatedSessions = [...prevSessions];
+                // Update this specific session with the message
+                updatedSessions[sessionIndex] = handleMessageForSession(data, updatedSessions[sessionIndex]);
                 
-                if (sessionIndex !== -1) {
-                  console.log(`Found session at index ${sessionIndex} for session_id ${sessionId}`);
-                  // Create a new array to avoid modifying state directly
-                  const updatedSessions = [...prevSessions];
-                  // Update this specific session with the message
-                  updatedSessions[sessionIndex] = handleMessageForSession(data, updatedSessions[sessionIndex]);
-                  
-                  // If this is a new message (not just streaming), auto-switch to this session if it's not the active one
-                  // This ensures messages appear in their respective chats visually
-                  if (data.type === 'processing_started' && sessionIndex !== activeSessionIndex) {
-                    console.log(`Auto-switching to session ${sessionIndex} for incoming message`);
-                    setTimeout(() => {
-                      setActiveSessionIndex(sessionIndex);
-                    }, 50);
-                  }
-                  
-                  return updatedSessions;
-                } else {
-                  console.error(`No session found with ID ${sessionId}`);
-                  return prevSessions;
+                // If this is a new message (not just streaming), auto-switch to this session if it's not the active one
+                // This ensures messages appear in their respective chats visually
+                if (data.type === 'processing_started' && sessionIndex !== activeSessionIndex) {
+                  console.log(`Auto-switching to session ${sessionIndex} for incoming message`);
+                  setTimeout(() => {
+                    setActiveSessionIndex(sessionIndex);
+                  }, 50);
                 }
-              });
-            } else {
-              // Fallback to using active session (legacy approach)
-              console.log('No session_id in response, using activeSessionIndex:', activeSessionIndex);
-              if (activeSessionIndex !== -1) {
-                handleSessionMessage(data, activeSessionIndex);
+                
+                return updatedSessions;
               } else {
-                console.error('Received message for unknown session:', data);
+                console.error(`No session found with ID ${sessionId}`);
+                return prevSessions;
               }
+            });
+          } else {
+            // Fallback to using active session (legacy approach)
+            console.log('No session_id in response, using activeSessionIndex:', activeSessionIndex);
+            if (activeSessionIndex !== -1) {
+              handleSessionMessage(data, activeSessionIndex);
+            } else {
+              console.error('Received message for unknown session:', data);
             }
-          } catch (error) {
-            console.error('Error processing WebSocket message:', error);
           }
-        };
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
 
-        // Handle WebSocket close
-        ws.onclose = (event) => {
-          console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason}`);
-          setConnected(false);
-        };
-      } catch (error) {
-        console.error('Error creating WebSocket connection:', error);
+      // Handle WebSocket errors
+      ws.onerror = (error) => {
+        console.error('WebSocket connection error:', error);
+        if (token) {
+          console.log('Token used for connection (first 10 chars):', token.substring(0, 10) + '...');
+          console.log('Attempted connection URL:', wsUrl);
+        } else {
+          console.error('No authentication token available!');
+        }
         setConnected(false);
-      }
-    };
-    
-    // Start connection attempt
-    connectWebSocket(wsUrl);
+        
+        // Clear the timeout if we got an error
+        clearTimeout(connectionTimeout);
+      };
+
+      // Handle WebSocket close
+      ws.onclose = (event) => {
+        console.log(`WebSocket disconnected with code: ${event.code}, reason: ${event.reason}`);
+        setConnected(false);
+        
+        // Clear the timeout if connection closed
+        clearTimeout(connectionTimeout);
+      };
+    } catch (error) {
+      console.error('Error creating WebSocket connection:', error);
+      console.error('Attempted connection URL:', wsUrl);
+      setConnected(false);
+    }
 
     // Clean up WebSocket connection when component unmounts
     return () => {
