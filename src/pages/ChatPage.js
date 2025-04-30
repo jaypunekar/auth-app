@@ -912,15 +912,7 @@ const ChatPage = () => {
   // Extract platforms mentioned in the content
   const extractPlatforms = (content) => {
     const platformMap = {
-      google: "Google",
-      meta: "Meta",
-      facebook: "Meta",
-      instagram: "Meta",
-      linkedin: "LinkedIn",
-      tiktok: "TikTok",
-      pinterest: "Pinterest",
-      snapchat: "Snapchat",
-      reddit: "Reddit",
+      google: "Google"
     };
 
     const platforms = new Set();

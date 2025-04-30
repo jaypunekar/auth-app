@@ -37,6 +37,7 @@ import {
   Lock as LockIcon,
   ContactSupport as ContactSupportIcon,
   StarBorder as StarBorderIcon,
+  ChatBubbleOutline as ChatBubbleOutlineIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -77,6 +78,7 @@ const MainLayout = () => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Chat with Assistant', icon: <ChatIcon />, path: '/chat' },
+    { text: 'Real-time Chat', icon: <ChatBubbleOutlineIcon />, path: '/ws-chat' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
@@ -101,15 +103,6 @@ const MainLayout = () => {
             </ListItemButton>
           </ListItem>
         ))}
-      </List>
-      <Divider />
-      <List>
-        <ListItem disablePadding>
-          <ListItemButton onClick={() => navigate('/campaigns/new')}>
-            <ListItemIcon><AddIcon /></ListItemIcon>
-            <ListItemText primary="Create Campaign" />
-          </ListItemButton>
-        </ListItem>
       </List>
       <Divider />
       <Box sx={{ p: 2 }}>

@@ -49,6 +49,7 @@ import ImageGenerator from '../components/ImageGeneration/ImageGenerator';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useAuth } from '../context/AuthContext';
+import TokenDisplay from '../components/TokenDisplay';
 
 // Helper function to group campaigns by platform
 const groupCampaignsByPlatform = (campaigns) => {
@@ -109,7 +110,7 @@ function TabPanel(props) {
 }
 
 const Dashboard = () => {
-  const { subscription } = useAuth();
+  const { subscription, token } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [googleAdsCampaigns, setGoogleAdsCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -836,7 +837,10 @@ const Dashboard = () => {
   const platforms = Object.keys(groupedCampaigns);
 
   return (
-    <Container>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Display JWT Token */}
+      <TokenDisplay token={token} />
+      
       {/* Payment Warning Alert */}
       {hasPaymentFailed && subscription.tier === 'Pro' && (
         <Alert 

@@ -49,92 +49,38 @@ const AdCampaignForm = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    platform: '',
+    platform: 'Google',
+    budget: '',
+    budget_type: 'Daily',
+    start_date: new Date(),
+    end_date: new Date(new Date().setDate(new Date().getDate() + 30)),
     status: 'Draft',
     target_audience: {
-      age_range: '',
+      location: '',
+      age_min: '',
+      age_max: '',
       gender: '',
       interests: '',
-      location: '',
+      keywords: '',
     },
-    budget: '',
-    budget_type: 'Daily', // Daily or Lifetime
-    start_date: null,
-    end_date: null,
     image: null,
-    // Meta specific fields
-    meta: {
-      objective: 'Awareness',
-      placement: 'Feeds',
-      optimization_goal: 'Impressions',
-      ad_format: 'Image',
-      headline: '',
-      primary_text: '',
-      call_to_action: 'Learn More',
-    },
     // Google specific fields
     google: {
-      objective: 'Search',
-      bidding_strategy: 'Manual CPC',
+      campaign_type: 'Search',
+      ad_type: 'Responsive Search Ad',
       keywords: '',
-      headlines: ['', '', ''],
-      descriptions: ['', ''],
+      negative_keywords: '',
+      headline_1: '',
+      headline_2: '',
+      headline_3: '',
+      description_1: '',
+      description_2: '',
       final_url: '',
-      display_path: '',
-      ad_extensions: '',
-    },
-    // TikTok specific fields
-    tiktok: {
-      objective: 'Traffic',
-      optimization_goal: 'Clicks',
-      ad_copy: '',
-      call_to_action: 'Learn More',
-    },
-    // Snapchat specific fields
-    snapchat: {
-      objective: 'Awareness',
-      placement: 'Stories',
-      headline: '',
-      call_to_action: 'Learn More',
-    },
-    // Reddit specific fields
-    reddit: {
-      objective: 'Brand Awareness',
-      targeting_subreddits: '',
-      bidding: 'Automatic',
-      ad_copy: '',
-      destination_url: '',
-    },
-    // Pinterest specific fields
-    pinterest: {
-      objective: 'Traffic',
-      targeting_interests: '',
-      targeting_keywords: '',
-      bidding: 'Automatic',
-      title: '',
-      description: '',
-      destination_url: '',
-    },
-    // LinkedIn specific fields
-    linkedin: {
-      objective: 'Website Visits',
-      targeting_job_titles: '',
-      targeting_industries: '',
-      targeting_company_size: '',
-      placement: 'Sponsored Content',
-      ad_copy: '',
-      call_to_action: 'Learn More',
-    },
+    }
   });
 
   const platforms = [
-    'Meta',
-    'Google',
-    'LinkedIn',
-    'Pinterest',
-    'Snapchat',
-    'TikTok',
-    'Reddit',
+    'Google'
   ];
 
   // Fetch campaign data if editing
@@ -550,59 +496,11 @@ const AdCampaignForm = () => {
   // Render platform-specific form based on selected platform
   const renderPlatformForm = () => {
     switch (formData.platform) {
-      case 'Meta':
-        return (
-          <MetaForm 
-            data={formData.meta} 
-            onChange={(data) => handlePlatformDataChange('meta', data)}
-            errors={fieldErrors}
-          />
-        );
       case 'Google':
         return (
           <GoogleForm 
             data={formData.google} 
             onChange={(data) => handlePlatformDataChange('google', data)}
-            errors={fieldErrors}
-          />
-        );
-      case 'TikTok':
-        return (
-          <TikTokForm 
-            data={formData.tiktok} 
-            onChange={(data) => handlePlatformDataChange('tiktok', data)}
-            errors={fieldErrors}
-          />
-        );
-      case 'Snapchat':
-        return (
-          <SnapchatForm 
-            data={formData.snapchat} 
-            onChange={(data) => handlePlatformDataChange('snapchat', data)}
-            errors={fieldErrors}
-          />
-        );
-      case 'Reddit':
-        return (
-          <RedditForm 
-            data={formData.reddit} 
-            onChange={(data) => handlePlatformDataChange('reddit', data)}
-            errors={fieldErrors}
-          />
-        );
-      case 'Pinterest':
-        return (
-          <PinterestForm 
-            data={formData.pinterest} 
-            onChange={(data) => handlePlatformDataChange('pinterest', data)}
-            errors={fieldErrors}
-          />
-        );
-      case 'LinkedIn':
-        return (
-          <LinkedInForm 
-            data={formData.linkedin} 
-            onChange={(data) => handlePlatformDataChange('linkedin', data)}
             errors={fieldErrors}
           />
         );

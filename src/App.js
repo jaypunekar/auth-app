@@ -17,6 +17,7 @@ import ResetPassword from './pages/auth/ResetPassword';
 import VerificationPage from './pages/auth/VerificationPage';
 import Dashboard from './pages/Dashboard';
 import ChatPage from './pages/ChatPage';
+import WebSocketChat from './components/WebSocketChat';
 import AdCampaignForm from './pages/AdCampaignForm';
 import AdCampaignDetail from './pages/AdCampaignDetail';
 import PageSpeedAnalysis from './pages/PageSpeedAnalysis';
@@ -69,6 +70,7 @@ function App() {
         }>
           <Route index element={<Dashboard />} />
           <Route path="chat" element={<ChatPage />} />
+          <Route path="ws-chat" element={<WebSocketChat />} />
           <Route path="campaigns/new" element={<AdCampaignForm />} />
           <Route path="campaigns/edit/:id" element={<AdCampaignForm />} />
           <Route path="campaigns/:id" element={<AdCampaignDetail />} />

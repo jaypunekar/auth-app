@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [token, setToken] = useState(getToken());
   const [subscription, setSubscription] = useState({
     tier: 'Free',
     features: {
@@ -170,12 +171,7 @@ export const AuthProvider = ({ children }) => {
       
       // Save token using the utility function
       const tokenStored = storeToken(access_token);
-      
-      if (!tokenStored) {
-        console.error('Failed to store token');
-        setError('Login failed: Could not store authentication token');
-        return false;
-      }
+      setToken(access_token);
       
       // Store user info if available
       if (response.data.user_id) {
@@ -379,6 +375,7 @@ export const AuthProvider = ({ children }) => {
     // Reset state
     setUser(null);
     setIsAuthenticated(false);
+    setToken(null);
   };
 
   // Direct auth data setting function
@@ -428,23 +425,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Context value
-  const value = {
+  // Provide auth context
+  return (
+    <AuthContext.Provider value={{
     user,
+      token,
     isAuthenticated,
     loading,
     error,
-    subscription,
     login,
     register,
-    googleLogin,
     logout,
+      checkSubscription,
     setAuthData,
+      subscription,
     updateSubscription,
-    checkSubscription
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+      googleLogin
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 // Custom hook to use auth context
