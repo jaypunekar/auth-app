@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -29,6 +29,8 @@ import {
   Tooltip,
   Container,
   AlertTitle,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -110,7 +112,7 @@ function TabPanel(props) {
 }
 
 const Dashboard = () => {
-  const { subscription, token } = useAuth();
+  const { subscription, token, user } = useAuth();
   const [campaigns, setCampaigns] = useState([]);
   const [googleAdsCampaigns, setGoogleAdsCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +132,13 @@ const Dashboard = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [includeDeleted, setIncludeDeleted] = useState(true); // Default to showing deleted ads
   
+  // New state for campaign performance data
+  const [campaignPerformance, setCampaignPerformance] = useState({});
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+  const [performanceError, setPerformanceError] = useState(null);
+
   // New state variables for responsive search ads
   const [responsiveAdsDialogOpen, setResponsiveAdsDialogOpen] = useState(false);
   const [responsiveAds, setResponsiveAds] = useState([]);
@@ -204,39 +212,37 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    const fetchCampaigns = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await adCampaignAPI.getCampaigns();
-        setCampaigns(response.data);
-      } catch (err) {
-        setError('Failed to load campaigns. Please try again.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchCampaigns();
-  }, []);
+  // Fetch campaigns from API
+  const fetchCampaigns = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await adCampaignAPI.getCampaigns(null, null, includeDeleted);
+      setCampaigns(response.data);
+    } catch (err) {
+      console.error('Error fetching campaigns:', err);
+      setError('Failed to load campaigns. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [includeDeleted]);
 
   useEffect(() => {
-    const fetchGoogleAdsCampaigns = async () => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
+
+  // Fetch Google Ads campaigns, feedback, and performance data when component mounts
+  useEffect(() => {
+    // Fetch Google Ads campaigns
+    const fetchGoogleAdsData = async () => {
       try {
         setGoogleAdsLoading(true);
         setGoogleAdsError(null);
         
         const response = await googleAdsAPI.getCampaigns();
         
-        // Check if the response was successful
         if (response.data && response.data.success && response.data.data && response.data.data.campaigns) {
           const campaigns = response.data.data.campaigns;
-          
-          // Debug: Log campaign date information
-          console.log("Google Ads Campaigns Data:", campaigns);
           
           // Process campaigns to ensure we have consistent date properties
           const processedCampaigns = campaigns.map(campaign => {
@@ -256,22 +262,11 @@ const Dashboard = () => {
               processed.endDate = campaign.end_date;
             }
             
-            // Debug each campaign's dates
-            console.log(`Campaign ${campaign.name} dates:`, {
-              start_date: campaign.start_date,
-              start_date_raw: campaign.start_date_raw,
-              end_date: campaign.end_date,
-              end_date_raw: campaign.end_date_raw,
-              processedStartDate: processed.startDate,
-              processedEndDate: processed.endDate
-            });
-            
             return processed;
           });
           
           setGoogleAdsCampaigns(processedCampaigns);
         } else {
-          // Handle unsuccessful response
           setGoogleAdsCampaigns([]);
           if (response.data && !response.data.success) {
             setGoogleAdsError(response.data.message || 'Failed to load Google Ads campaigns');
@@ -285,36 +280,32 @@ const Dashboard = () => {
         setGoogleAdsLoading(false);
       }
     };
-    
-    fetchGoogleAdsCampaigns();
-  }, []);
 
-  // Fetch liked and disliked responses
-  useEffect(() => {
-    // Only fetch when the response review tab is active
-    if (activeTab !== 3) return;
-    
-    const fetchFeedback = async () => {
+    // Fetch feedback data
+    const fetchFeedbackData = async () => {
+      if (activeTab !== 3) return; // Only fetch when feedback tab is active
+      
       try {
         setLoadingFeedback(true);
         setFeedbackError(null);
         
-        // Fetch liked responses
         const likedResponse = await feedbackAPI.getLikedMessages();
-        setLikedResponses(likedResponse.data);
-        
-        // Fetch disliked responses
         const dislikedResponse = await feedbackAPI.getDislikedMessages();
+        
+        setLikedResponses(likedResponse.data);
         setDislikedResponses(dislikedResponse.data);
       } catch (err) {
         console.error('Error fetching feedback:', err);
-        setFeedbackError('Failed to load response feedback. Please try again.');
+        setFeedbackError('Failed to load feedback data');
       } finally {
         setLoadingFeedback(false);
       }
     };
-    
-    fetchFeedback();
+
+    // Call all the fetch functions
+    fetchGoogleAdsData();
+    fetchFeedbackData();
+    fetchCampaignPerformance();
   }, [activeTab]);
 
   const handleGenerateImage = async (campaignId) => {
@@ -709,24 +700,45 @@ const Dashboard = () => {
     try {
       setDeletingCampaign(true);
       
-      const response = await googleAdsAPI.deleteCampaign(campaignToDelete.id);
-      
-      if (response.data && response.data.success) {
-        // Remove the campaign from the state
-        const updatedCampaigns = googleAdsCampaigns.filter(
-          (campaign) => campaign.id !== campaignToDelete.id
-        );
-        setGoogleAdsCampaigns(updatedCampaigns);
+      // If it's a Google Ads campaign
+      if (activeTab === 1) {
+        const response = await googleAdsAPI.deleteCampaign(campaignToDelete.id);
         
-        // Show success message
-        setSnackbarMessage(`Campaign "${campaignToDelete.name}" deleted successfully`);
-        setSnackbarSeverity('success');
-        setSnackbarOpen(true);
+        if (response.data && response.data.success) {
+          // Remove the campaign from the state
+          const updatedCampaigns = googleAdsCampaigns.filter(
+            (campaign) => campaign.id !== campaignToDelete.id
+          );
+          setGoogleAdsCampaigns(updatedCampaigns);
+          
+          // Show success message
+          setSnackbarMessage(`Campaign "${campaignToDelete.name}" deleted successfully`);
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        } else {
+          // Show error message
+          setSnackbarMessage(response.data?.message || 'Failed to delete campaign');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+        }
       } else {
-        // Show error message
-        setSnackbarMessage(response.data?.message || 'Failed to delete campaign');
-        setSnackbarSeverity('error');
-        setSnackbarOpen(true);
+        // For AdTask campaigns (soft delete)
+        const response = await adCampaignAPI.deleteCampaign(campaignToDelete.id);
+        
+        if (response.data) {
+          // Refresh campaigns to show updated state
+          fetchCampaigns();
+          
+          // Show success message
+          setSnackbarMessage(`Campaign "${campaignToDelete.title}" deleted successfully`);
+          setSnackbarSeverity('success');
+          setSnackbarOpen(true);
+        } else {
+          // Show error message
+          setSnackbarMessage('Failed to delete campaign');
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+        }
       }
     } catch (err) {
       console.error('Error deleting campaign:', err);
@@ -825,6 +837,138 @@ const Dashboard = () => {
 
   const [updatingAd, setUpdatingAd] = useState(false);
 
+  // Inside the Dashboard component before the TabPanel index={0}
+  // Add this toggle for including deleted ads
+  const toggleDeletedAds = () => {
+    setIncludeDeleted(!includeDeleted);
+  };
+
+  // Function to fetch campaign performance data
+  const fetchCampaignPerformance = async () => {
+    try {
+      setLoadingPerformance(true);
+      setPerformanceError(null);
+      
+      const response = await googleAdsAPI.getCampaignPerformance();
+      
+      if (response.data && response.data.success) {
+        // Convert the array to an object keyed by campaign_id for easier lookup
+        const performanceMap = {};
+        const performanceData = response.data.data.performance_data || [];
+        
+        performanceData.forEach(item => {
+          if (!performanceMap[item.campaign_id]) {
+            performanceMap[item.campaign_id] = [];
+          }
+          performanceMap[item.campaign_id].push(item);
+        });
+        
+        setCampaignPerformance(performanceMap);
+      } else {
+        console.error("Failed to fetch campaign performance:", response.data?.message);
+      }
+    } catch (error) {
+      console.error("Error fetching campaign performance:", error);
+      setPerformanceError("Failed to load campaign performance data");
+    } finally {
+      setLoadingPerformance(false);
+    }
+  };
+
+  // Component to render performance data for a campaign
+  const CampaignPerformance = ({ campaignId }) => {
+    const performanceData = campaignPerformance[campaignId] || [];
+    
+    if (loadingPerformance) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+          <CircularProgress size={20} />
+          <Typography variant="body2" sx={{ ml: 1 }}>Loading performance data...</Typography>
+        </Box>
+      );
+    }
+    
+    if (performanceError) {
+      return (
+        <Alert severity="error" sx={{ my: 2 }}>
+          {performanceError}
+        </Alert>
+      );
+    }
+    
+    if (performanceData.length === 0) {
+      return (
+        <Alert severity="info" sx={{ my: 2 }}>
+          No performance data available for the last 30 days.
+        </Alert>
+      );
+    }
+    
+    // Calculate totals
+    const totals = performanceData.reduce((acc, curr) => {
+      acc.impressions += curr.impressions || 0;
+      acc.clicks += curr.clicks || 0;
+      acc.cost += curr.cost || 0;
+      return acc;
+    }, { impressions: 0, clicks: 0, cost: 0 });
+    
+    // Calculate averages
+    const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+    const avgCPC = totals.clicks > 0 ? totals.cost / totals.clicks : 0;
+    
+    return (
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Performance (Last 30 Days)
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={6} sm={3}>
+            <Box sx={{ p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+              <Typography variant="caption" color="textSecondary">Impressions</Typography>
+              <Typography variant="h6">{totals.impressions.toLocaleString()}</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Box sx={{ p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+              <Typography variant="caption" color="textSecondary">Clicks</Typography>
+              <Typography variant="h6">{totals.clicks.toLocaleString()}</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Box sx={{ p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+              <Typography variant="caption" color="textSecondary">CTR</Typography>
+              <Typography variant="h6">{avgCTR.toFixed(2)}%</Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} sm={3}>
+            <Box sx={{ p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+              <Typography variant="caption" color="textSecondary">Cost</Typography>
+              <Typography variant="h6">${totals.cost.toFixed(2)}</Typography>
+            </Box>
+          </Grid>
+        </Grid>
+        
+        {performanceData.length > 1 && (
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" color="textSecondary">
+              By Device
+            </Typography>
+            <Grid container spacing={1} sx={{ mt: 0.5 }}>
+              {performanceData.map((data, index) => (
+                <Grid item xs={12} key={index}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', p: 1, bgcolor: 'background.paper', borderRadius: 1, mb: 1 }}>
+                    <Typography variant="body2">{data.device}</Typography>
+                    <Typography variant="body2">{data.impressions.toLocaleString()} impr. / {data.clicks.toLocaleString()} clicks</Typography>
+                  </Box>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
+        )}
+      </Box>
+    );
+  };
+
   if (loading && googleAdsLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -840,6 +984,16 @@ const Dashboard = () => {
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Display JWT Token */}
       <TokenDisplay token={token} />
+      
+      {/* Welcome Message */}
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Welcome, {user?.first_name || 'there'}!
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Manage your campaigns and analytics
+        </Typography>
+      </Box>
       
       {/* Payment Warning Alert */}
       {hasPaymentFailed && subscription.tier === 'Pro' && (
@@ -861,15 +1015,6 @@ const Dashboard = () => {
           Your Pro subscription payment has failed. Pro features will be disabled on {graceEndDate}. Please update your payment method to continue using premium features.
         </Alert>
       )}
-      
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom>
-          Dashboard
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Manage your campaigns and analytics
-        </Typography>
-      </Box>
       
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom>
@@ -989,7 +1134,35 @@ const Dashboard = () => {
       </Tabs>
       
       <TabPanel value={activeTab} index={0}>
-        {/* Your Campaigns Tab Content */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h5" component="h2">
+            Ad Campaigns
+          </Typography>
+          <Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={includeDeleted}
+                  onChange={toggleDeletedAds}
+                  color="primary"
+                />
+              }
+              label="Show Deleted Campaigns"
+            />
+            <Button
+              variant="contained"
+              color="primary"
+              component={RouterLink}
+              to="/campaigns/new"
+              startIcon={<AddIcon />}
+              sx={{ ml: 2 }}
+              disabled={!canCreateCampaign}
+            >
+              Create New Campaign
+            </Button>
+          </Box>
+        </Box>
+        
         {error && (
           <Alert severity="error" sx={{ mb: 3 }}>
             {error}
@@ -1028,7 +1201,12 @@ const Dashboard = () => {
                 <Grid container spacing={3}>
                   {platformCampaigns.map((campaign) => (
                     <Grid item xs={12} sm={6} md={4} key={campaign.id}>
-                      <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <Card sx={{ 
+                        height: '100%', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        opacity: campaign.deleted ? 0.7 : 1 
+                      }}>
                         {campaign.image_url ? (
                           <CardMedia
                             component="img"
@@ -1046,6 +1224,14 @@ const Dashboard = () => {
                             <Typography variant="h6" component="div" noWrap sx={{ flexGrow: 1 }}>
                               {campaign.title}
                             </Typography>
+                            {campaign.deleted && (
+                              <Chip
+                                label="Deleted"
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                              />
+                            )}
                             <Chip 
                               label={campaign.status} 
                               size="small" 
@@ -1061,6 +1247,11 @@ const Dashboard = () => {
                             <Typography variant="body2" sx={{ mt: 1 }}>
                               Budget: ${campaign.budget} {campaign.budget_type}
                             </Typography>
+                          )}
+                          
+                          {/* Add campaign performance component for Google campaigns */}
+                          {campaign.platform === "Google" && campaign.google_ads_campaign_id && (
+                            <CampaignPerformance campaignId={campaign.google_ads_campaign_id} />
                           )}
                         </CardContent>
                         <CardActions>
@@ -1175,15 +1366,20 @@ const Dashboard = () => {
                         </Typography>
                       </Box>
                           
-                          <Button
-                            fullWidth
-                            variant="outlined"
-                            color="primary"
-                            sx={{ mt: 2 }}
-                            onClick={() => handleViewResponsiveAds(campaign.id)}
-                          >
-                            View & Edit Ads
-                          </Button>
+                      {/* Add campaign performance data */}
+                      {campaign.id && (
+                        <CampaignPerformance campaignId={campaign.id} />
+                      )}
+                          
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="primary"
+                        sx={{ mt: 2 }}
+                        onClick={() => handleViewResponsiveAds(campaign.id)}
+                      >
+                        View & Edit Ads
+                      </Button>
                     </CardContent>
                     <CardActions>
                       <Button

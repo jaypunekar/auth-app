@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import {
   Box,
@@ -16,6 +17,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Grid,
 } from '@mui/material';
 import { Google as GoogleIcon } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +28,9 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [formError, setFormError] = useState('');
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
@@ -37,8 +42,8 @@ const Register = () => {
     setIsSubmitting(true);
 
     // Validate form
-    if (!email || !password || !confirmPassword) {
-      setFormError('Please fill in all fields');
+    if (!email || !password || !confirmPassword || !firstName || !lastName) {
+      setFormError('Please fill in all required fields');
       setIsSubmitting(false);
       return;
     }
@@ -60,7 +65,10 @@ const Register = () => {
       const apiUrl = process.env.REACT_APP_API_URL || '/api';
       await axios.post(`${apiUrl}/auth/request-verification`, {
         email,
-        password
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber || null // Make phone number optional
       });
 
       // Navigate to verification page
@@ -77,21 +85,21 @@ const Register = () => {
     }
   };
 
-  const handleGoogleLogin = useGoogleLogin({
-    onSuccess: async (response) => {
-      const success = await googleLogin(response.access_token);
-      
-      if (success) {
-        navigate('/');
-      }
-    },
-    onError: (error) => {
-      console.error('Google login error:', error);
-      setFormError('Google login failed. Please try again.');
-    },
-    flow: 'implicit',
-    prompt: 'select_account',
-  });
+  const handleGoogleLogin = (credentialResponse) => {
+    googleLogin(credentialResponse.credential)
+      .then(success => {
+        if (success) {
+          console.log('Google login successful, navigating to dashboard');
+          navigate('/');
+        } else {
+          setFormError(error || 'Google login failed. Please try again.');
+        }
+      })
+      .catch(err => {
+        console.error('Google login error:', err);
+        setFormError(err.message || 'An error occurred during Google login');
+      });
+  };
 
   const handleDialogClose = () => {
     setRegistrationSuccess(false);
@@ -100,7 +108,7 @@ const Register = () => {
 
   const handleLegacyRegister = async () => {
     // Use the original register function for backward compatibility
-    const success = await register(email, password);
+    const success = await register(email, password, firstName, lastName, phoneNumber);
     
     if (success) {
       setRegisteredEmail(email);
@@ -117,6 +125,37 @@ const Register = () => {
           </Alert>
         )}
 
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="firstName"
+              label="First Name"
+              name="firstName"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              disabled={isSubmitting || loading}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="lastName"
+              label="Last Name"
+              name="lastName"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              disabled={isSubmitting || loading}
+            />
+          </Grid>
+        </Grid>
+
         <TextField
           margin="normal"
           required
@@ -125,9 +164,20 @@ const Register = () => {
           label="Email Address"
           name="email"
           autoComplete="email"
-          autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          disabled={isSubmitting || loading}
+        />
+
+        <TextField
+          margin="normal"
+          fullWidth
+          id="phoneNumber"
+          label="Phone Number (Optional)"
+          name="phoneNumber"
+          autoComplete="tel"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
           disabled={isSubmitting || loading}
         />
 
@@ -177,16 +227,18 @@ const Register = () => {
           </Divider>
         </Box>
 
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<GoogleIcon />}
-          onClick={() => handleGoogleLogin()}
-          disabled={isSubmitting || loading}
-          sx={{ mb: 2 }}
-        >
-          Sign up with Google
-        </Button>
+        <GoogleLogin
+          onSuccess={handleGoogleLogin}
+          onError={() => {
+            console.error('Google login failed');
+            setFormError('Google login failed. Please try again.');
+          }}
+          useOneTap
+          theme="outline"
+          text="signup_with"
+          shape="rectangular"
+          width="100%"
+        />
 
         <Box sx={{ mt: 2, textAlign: 'center' }}>
           <Link component={RouterLink} to="/login" variant="body2">

@@ -125,7 +125,7 @@ const WebSocketChat = () => {
           });
         }
       }, 10000); // 10 second timeout
-      
+
       // Listen for messages
       ws.onmessage = (event) => {
         try {
@@ -523,6 +523,30 @@ const WebSocketChat = () => {
             );
           }
           console.log(`Tool call completed for session ${session.sessionId}`, completionInfo);
+          
+          // Check if credit information was included (for image generation)
+          if (completionInfo.credits_remaining !== undefined) {
+            console.log(`Credits remaining: ${completionInfo.credits_remaining}`);
+            
+            // Trigger refresh in any CreditDisplay components
+            // Use CustomEvent to communicate with other components
+            const creditUpdateEvent = new CustomEvent('credits-updated', { 
+              detail: { credits: completionInfo.credits_remaining } 
+            });
+            document.dispatchEvent(creditUpdateEvent);
+            
+            // Add user message about credit usage
+            if (completionInfo.function === 'generate_image') {
+              updatedSession.messages = [
+                ...updatedSession.messages,
+                { 
+                  role: 'system', 
+                  content: `2 credits used for image generation. ${completionInfo.credits_remaining} credits remaining.`, 
+                  isCredit: true 
+                }
+              ];
+            }
+          }
         } catch (error) {
           console.error('Error handling tool_call_completed:', error);
         }
@@ -723,7 +747,7 @@ const WebSocketChat = () => {
     
     if (images.length === 0) {
       // If no images, just return the text
-      return cleanedContent;
+    return cleanedContent;
     }
     
     // If there are images, render the text with image cards inserted
@@ -1205,7 +1229,7 @@ const WebSocketChat = () => {
 
   // Add sidebar rendering for chat history
   const ChatSidebar = () => {
-    return (
+  return (
       <Box sx={{ width: 250, height: '100%', borderRight: 1, borderColor: 'divider' }}>
         <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>
@@ -1257,7 +1281,7 @@ const WebSocketChat = () => {
                             session.first_message.substring(0, 30) + '...' : 
                             session.first_message) : 
                           `Chat ${index + 1}`}
-                      </Typography>
+      </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                         {session.last_updated ? 
                           new Date(session.last_updated).toLocaleDateString() : 
@@ -1294,26 +1318,26 @@ const WebSocketChat = () => {
         {/* Session tabs at the top */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Tabs 
-              value={activeSessionIndex} 
-              onChange={handleTabChange}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ 
-                flexGrow: 1,
+        <Tabs 
+          value={activeSessionIndex} 
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ 
+            flexGrow: 1,
                 '& .MuiTabs-indicator': {
                   backgroundColor: 'primary.main',
-                }
-              }}
-            >
-              {sessions && sessions.map((session, index) => (
-                <Tab 
-                  key={index}
-                  label={
-                    <Box sx={{ 
+            }
+          }}
+        >
+          {sessions && sessions.map((session, index) => (
+            <Tab 
+              key={index} 
+              label={
+                <Box sx={{ 
                       position: 'relative', 
-                      display: 'flex', 
-                      alignItems: 'center',
+                  display: 'flex', 
+                  alignItems: 'center', 
                       maxWidth: '150px'
                     }}>
                       <Typography 
@@ -1329,28 +1353,28 @@ const WebSocketChat = () => {
                       {session.isTyping && (
                         <Box 
                           sx={{ 
-                            width: '8px', 
-                            height: '8px', 
-                            borderRadius: '50%', 
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
                             bgcolor: 'primary.main',
                             ml: 1
                           }} 
                         />
                       )}
-                    </Box>
-                  }
-                  sx={getSessionTabStyle(index)}
-                />
-              ))}
-            </Tabs>
+                </Box>
+              }
+              sx={getSessionTabStyle(index)}
+            />
+          ))}
+        </Tabs>
             
-            <IconButton 
+        <IconButton 
               onClick={(e) => handleSessionMenuOpen(e)}
               sx={{ mr: 1 }}
               aria-label="session options"
-            >
-              <MoreVertIcon />
-            </IconButton>
+        >
+          <MoreVertIcon />
+        </IconButton>
           </Box>
         </Box>
         
@@ -1368,67 +1392,67 @@ const WebSocketChat = () => {
               <Divider />
               <MenuItem onClick={() => { handleSessionMenuClose(); renameSession(activeSessionIndex); }}>
                 <ListItemText primary="Rename Chat" />
-              </MenuItem>
+          </MenuItem>
               <MenuItem onClick={() => { handleSessionMenuClose(); closeSession(activeSessionIndex); }}>
                 <ListItemText primary="Close Chat" />
               </MenuItem>
             </>
           )}
         </Menu>
-        
-        {/* Messages area */}
-        <Paper elevation={3} sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          flexGrow: 1,
-          mb: 2,
-          p: 2,
+      
+      {/* Messages area */}
+      <Paper elevation={3} sx={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        flexGrow: 1,
+        mb: 2,
+        p: 2,
           maxHeight: 'calc(100vh - 220px)',
-          overflowY: 'auto'
-        }}>
-          {activeSession ? (
-            <>
-              {renderSessionContent(activeSession)}
-            </>
-          ) : (
-            <Typography variant="body2" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
-              No active chat session. Create a new session to start chatting.
-            </Typography>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </Paper>
-        
-        {/* Input area */}
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Type your message..."
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={!connected || !activeSession?.sessionId}
-            multiline
-            maxRows={4}
-            sx={{ mr: 1 }}
-          />
-          <Button 
-            variant="contained" 
-            color="primary"
-            endIcon={<SendIcon />}
-            onClick={sendMessage}
-            disabled={!connected || !activeSession?.sessionId || !inputMessage.trim()}
-          >
-            Send
-          </Button>
-        </Box>
-        
-        {!connected && (
-          <Typography color="error" sx={{ mt: 2 }}>
-            Not connected to chat server. Please refresh the page to try again.
+        overflowY: 'auto'
+      }}>
+        {activeSession ? (
+          <>
+            {renderSessionContent(activeSession)}
+          </>
+        ) : (
+          <Typography variant="body2" sx={{ p: 2, textAlign: 'center', color: 'text.secondary' }}>
+            No active chat session. Create a new session to start chatting.
           </Typography>
         )}
+        
+        <div ref={messagesEndRef} />
+      </Paper>
+      
+      {/* Input area */}
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Type your message..."
+          value={inputMessage}
+          onChange={(e) => setInputMessage(e.target.value)}
+          onKeyPress={handleKeyPress}
+          disabled={!connected || !activeSession?.sessionId}
+          multiline
+          maxRows={4}
+          sx={{ mr: 1 }}
+        />
+        <Button 
+          variant="contained" 
+          color="primary"
+          endIcon={<SendIcon />}
+          onClick={sendMessage}
+          disabled={!connected || !activeSession?.sessionId || !inputMessage.trim()}
+        >
+          Send
+        </Button>
+      </Box>
+      
+      {!connected && (
+        <Typography color="error" sx={{ mt: 2 }}>
+          Not connected to chat server. Please refresh the page to try again.
+        </Typography>
+      )}
       </Box>
     </Box>
   );

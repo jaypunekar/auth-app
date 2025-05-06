@@ -31,7 +31,7 @@ const theme = createTheme({
 });
 
 // Google Client ID
-const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || 'your-google-client-id';
+const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '54177097472-avb68lpdn4r419ri9gpumtefl0atg0kc.apps.googleusercontent.com';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

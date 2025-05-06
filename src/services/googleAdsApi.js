@@ -231,11 +231,28 @@ const googleAdsApi = {
     }
   },
 
-  // Unlink a Google Ads account (only available for linked accounts, not created accounts)
-  unlinkAccount: async () => {
+  // Check for active campaigns before unlinking
+  checkActiveCampaigns: async () => {
     try {
-      console.log('Unlinking Google Ads account');
-      const response = await api.post('/google-ads/unlink-account');
+      console.log('Checking for active campaigns before unlinking...');
+      const response = await api.get('/google-ads/check-active-campaigns');
+      console.log('Active campaigns check response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking active campaigns:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Unlink a Google Ads account (only available for linked accounts, not created accounts)
+  unlinkAccount: async (pauseCampaigns = false) => {
+    try {
+      console.log(`Unlinking Google Ads account ${pauseCampaigns ? 'and pausing campaigns' : ''}`);
+      const response = await api.post('/google-ads/unlink-account', { pause_campaigns: pauseCampaigns });
       console.log('Unlink account response:', response.data);
       return response.data;
     } catch (error) {

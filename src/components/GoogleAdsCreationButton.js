@@ -74,6 +74,14 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   const [newDescription, setNewDescription] = useState('');
   const [newKeyword, setNewKeyword] = useState('');
 
+  // State for the unlink confirmation dialogs
+  const [unlinkConfirmStep, setUnlinkConfirmStep] = useState(0);
+  const [showUnlinkDialog, setShowUnlinkDialog] = useState(false);
+  const [hasActiveCampaigns, setHasActiveCampaigns] = useState(false);
+  const [activeCampaignCount, setActiveCampaignCount] = useState(0);
+  const [pauseCampaigns, setPauseCampaigns] = useState(false);
+  const [unlinkSuccess, setUnlinkSuccess] = useState(false);
+
   // Update open state when externalOpen changes
   useEffect(() => {
     if (externalOpen !== undefined) {
@@ -715,6 +723,107 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
 
   const steps = ['Campaign Settings', 'Ad Content', 'Keywords & Targeting', 'Review & Create'];
 
+  // Function to handle the unlink account process
+  const handleUnlinkAccount = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Check for active campaigns
+      const activeCampaignsResponse = await googleAdsApi.checkActiveCampaigns();
+      if (activeCampaignsResponse && activeCampaignsResponse.data) {
+        setHasActiveCampaigns(activeCampaignsResponse.data.has_active_campaigns);
+        setActiveCampaignCount(activeCampaignsResponse.data.active_campaign_count);
+      }
+      
+      // Open the unlink dialog with step 1
+      setUnlinkConfirmStep(1);
+      setShowUnlinkDialog(true);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error checking active campaigns:', error);
+      setError(error.response?.data?.detail || 'Failed to check account status. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // Handle closing the unlink dialog
+  const handleCloseUnlinkDialog = () => {
+    setShowUnlinkDialog(false);
+    setUnlinkConfirmStep(0);
+    setPauseCampaigns(false);
+    setUnlinkSuccess(false);
+  };
+
+  // Handle the first confirmation step (active campaigns warning)
+  const handleFirstConfirmStep = (confirmed) => {
+    if (!confirmed) {
+      // User chose "No, keep my account"
+      handleCloseUnlinkDialog();
+      return;
+    }
+    
+    // User chose "Yes, pause my account and unlink anyway"
+    if (hasActiveCampaigns) {
+      setPauseCampaigns(true);
+    }
+    
+    // Move to step 2 (data deletion warning)
+    setUnlinkConfirmStep(2);
+  };
+
+  // Handle the second confirmation step (data deletion warning)
+  const handleSecondConfirmStep = async (confirmed) => {
+    if (!confirmed) {
+      // User chose "No, keep my account"
+      handleCloseUnlinkDialog();
+      return;
+    }
+    
+    // User chose "Yes, unlink my account"
+    try {
+      setLoading(true);
+      const response = await googleAdsApi.unlinkAccount(pauseCampaigns);
+      
+      if (response && response.success) {
+        setSuccess(response.message || 'Account unlinked successfully');
+        setAccountStatus({
+          isLinked: false,
+          customerId: '',
+          connectionType: '',
+          availableFunds: 0
+        });
+        
+        // Move to step 3 (success and offer to add a different account)
+        setUnlinkConfirmStep(3);
+        setUnlinkSuccess(true);
+      } else {
+        setError('Failed to unlink account. Please try again.');
+        handleCloseUnlinkDialog();
+      }
+    } catch (error) {
+      console.error('Error unlinking account:', error);
+      setError(error.response?.data?.detail || 'Failed to unlink account. Please try again.');
+      handleCloseUnlinkDialog();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle the final step (add a different account)
+  const handleAddDifferentAccount = (confirmed) => {
+    handleCloseUnlinkDialog();
+    
+    if (confirmed) {
+      // User chose "Yes" to add a different account
+      // Reset the form and go to step 0
+      setActiveStep(0);
+    } else {
+      // User chose "No" - just close everything
+      handleClose();
+    }
+  };
+
   return (
     <>
       {!externalOpen && (
@@ -771,6 +880,31 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
                 </Alert>
               )}
               
+              {/* Account Status & Unlink Button */}
+              {accountStatus.isLinked && (
+                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e0e0e0', p: 2, borderRadius: 1 }}>
+                  <Box>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Connected Account: {accountStatus.customerId}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Connection Type: {accountStatus.connectionType === 'created' ? 'Created by Us' : 'Linked External Account'}
+                    </Typography>
+                  </Box>
+                  {(accountStatus.connectionType === 'linked') && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<ExitToAppIcon />}
+                      onClick={handleUnlinkAccount}
+                      disabled={loading}
+                    >
+                      Unlink Account
+                    </Button>
+                  )}
+                </Box>
+              )}
+              
               <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
                 {steps.map((label) => (
                   <Step key={label}>
@@ -820,6 +954,107 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
             </>
           )}
         </DialogActions>
+      </Dialog>
+
+      {/* Unlink Account Confirmation Dialog Series */}
+      <Dialog 
+        open={showUnlinkDialog} 
+        onClose={handleCloseUnlinkDialog}
+        maxWidth="sm" 
+        fullWidth
+      >
+        {/* Step 1: Active Campaign Warning */}
+        {unlinkConfirmStep === 1 && (
+          <>
+            <DialogTitle>
+              {hasActiveCampaigns ? 'Active Campaigns Detected' : 'Unlink Google Ads Account'}
+            </DialogTitle>
+            <DialogContent>
+              {hasActiveCampaigns ? (
+                <>
+                  <Alert severity="warning" sx={{ mb: 2 }}>
+                    You have {activeCampaignCount} active {activeCampaignCount === 1 ? 'campaign' : 'campaigns'} in your Google Ads account.
+                  </Alert>
+                  <Typography variant="body1" gutterBottom>
+                    Do you want to pause your active campaigns and unlink your account anyway?
+                  </Typography>
+                </>
+              ) : (
+                <Typography variant="body1" gutterBottom>
+                  Are you sure you want to unlink your Google Ads account?
+                </Typography>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => handleFirstConfirmStep(false)}>
+                No, Keep My Account
+              </Button>
+              <Button 
+                onClick={() => handleFirstConfirmStep(true)} 
+                color="primary" 
+                variant="contained"
+                disabled={loading}
+              >
+                {hasActiveCampaigns ? 'Yes, Pause and Unlink Anyway' : 'Yes, Continue'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+        
+        {/* Step 2: Data Deletion Warning */}
+        {unlinkConfirmStep === 2 && (
+          <>
+            <DialogTitle>Confirm Account Unlinking</DialogTitle>
+            <DialogContent>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                Unlinking your account will delete your connection data from our system.
+              </Alert>
+              <Typography variant="body1" gutterBottom>
+                Are you sure you want to unlink your Google Ads account?
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => handleSecondConfirmStep(false)}>
+                No, Keep My Account
+              </Button>
+              <Button 
+                onClick={() => handleSecondConfirmStep(true)} 
+                color="primary" 
+                variant="contained"
+                disabled={loading}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Yes, Unlink My Account'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+        
+        {/* Step 3: Success and Add Different Account */}
+        {unlinkConfirmStep === 3 && unlinkSuccess && (
+          <>
+            <DialogTitle>Account Successfully Unlinked</DialogTitle>
+            <DialogContent>
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Your account will be deleted from our system within 24 hours.
+              </Alert>
+              <Typography variant="body1" gutterBottom>
+                Would you like to add a different Google Ads account?
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => handleAddDifferentAccount(false)}>
+                No
+              </Button>
+              <Button 
+                onClick={() => handleAddDifferentAccount(true)} 
+                color="primary" 
+                variant="contained"
+              >
+                Yes
+              </Button>
+            </DialogActions>
+          </>
+        )}
       </Dialog>
     </>
   );

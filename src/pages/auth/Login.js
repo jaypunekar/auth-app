@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
 import {
   Box,
   Button,
@@ -95,7 +96,14 @@ const Login = () => {
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (response) => {
       try {
-        const success = await googleLogin(response.access_token);
+        // Get the ID token from Google
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${response.access_token}` }
+        });
+        const userInfo = await res.json();
+        
+        // Pass the ID token instead of access token
+        const success = await googleLogin(response.access_token, userInfo.sub);
         
         if (success) {
           console.log('Google login successful, navigating to dashboard');
@@ -112,8 +120,9 @@ const Login = () => {
       console.error('Google login error:', error);
       setFormError('Google login failed. Please try again.');
     },
+    // Use authorization code flow to get ID token
     flow: 'implicit',
-    prompt: 'select_account',
+    scope: 'email profile',
   });
 
   const handleForgotPasswordOpen = () => {
@@ -225,16 +234,33 @@ const Login = () => {
               </Divider>
             </Box>
             
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<GoogleIcon />}
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              sx={{ mb: 2 }}
-            >
-              Sign in with Google
-            </Button>
+            <GoogleLogin
+              onSuccess={credentialResponse => {
+                console.log('Google credential response:', credentialResponse);
+                googleLogin(credentialResponse.credential)
+                  .then(success => {
+                    if (success) {
+                      console.log('Google login successful, navigating to dashboard');
+                      navigate('/');
+                    } else {
+                      setFormError(authError || 'Google login failed. Please try again.');
+                    }
+                  })
+                  .catch(err => {
+                    console.error('Google login error:', err);
+                    setFormError(err.message || 'An error occurred during Google login');
+                  });
+              }}
+              onError={() => {
+                console.error('Google login failed');
+                setFormError('Google login failed. Please try again.');
+              }}
+              useOneTap
+              theme="outline"
+              text="signin_with"
+              shape="rectangular"
+              width="100%"
+            />
             
             <Box sx={{ mt: 2, textAlign: 'center' }}>
               <Link component={RouterLink} to="/register" variant="body2">

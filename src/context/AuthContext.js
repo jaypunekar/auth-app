@@ -243,7 +243,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Register function
-  const register = async (email, password) => {
+  const register = async (email, password, firstName, lastName, phoneNumber = null) => {
     try {
       setLoading(true);
       setError(null);
@@ -251,7 +251,10 @@ export const AuthProvider = ({ children }) => {
       // Register user
       await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/register`, {
         email,
-        password
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: phoneNumber
       });
       
       // Login after registration
@@ -265,10 +268,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Google login function
-  const googleLogin = async (token) => {
+  const googleLogin = async (token, userId = null) => {
     try {
       setLoading(true);
       setError(null);
+      
+      console.log('Attempting Google login with token type:', typeof token);
+      console.log('Token preview:', token ? `${token.substring(0, 20)}...` : 'no token');
       
       // Clear any existing token before login
       authLogout();
@@ -276,7 +282,8 @@ export const AuthProvider = ({ children }) => {
       
       // Get token
       const response = await axios.post(`${process.env.REACT_APP_API_URL || '/api'}/auth/google`, {
-        token
+        token,
+        userId
       });
       
       const { access_token } = response.data;

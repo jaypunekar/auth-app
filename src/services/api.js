@@ -240,7 +240,7 @@ export const authAPI = {
       throw error;
     }
   },
-  googleLogin: (token) => api.post('/auth/google', { token }),
+  googleLogin: (token, userId = null) => api.post('/auth/google', { token, userId }),
   getUser: () => api.get('/auth/me'),
 };
 
@@ -270,12 +270,13 @@ export const adCampaignAPI = {
       'Content-Type': 'multipart/form-data'
     }
   }),
-  getCampaigns: (platform, status) => {
+  getCampaigns: (platform, status, includeDeleted = false) => {
     let url = '/ads';
     const params = {};
     
     if (platform) params.platform = platform;
     if (status) params.status = status;
+    if (includeDeleted) params.include_deleted = true;
     
     return api.get(url, { params });
   },
@@ -492,7 +493,32 @@ export const googleAdsAPI = {
       }
       throw error;
     }
-  }
+  },
+
+  // Get campaign performance data
+  getCampaignPerformance: async (campaignId = null) => {
+    try {
+      console.log('Fetching Google Ads campaign performance data...');
+      let url = '/google-ads/campaign-performance';
+      
+      // Add campaign_id as query parameter if provided
+      const params = {};
+      if (campaignId) {
+        params.campaign_id = campaignId;
+      }
+      
+      const response = await api.get(url, { params });
+      console.log('Google Ads campaign performance data:', response.data);
+      return response;
+    } catch (error) {
+      console.error('Error getting Google Ads campaign performance:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
 };
 
 // Add a new API service for image generation

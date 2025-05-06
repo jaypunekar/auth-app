@@ -42,6 +42,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
 import GoogleAdsCreationButton from '../GoogleAdsCreationButton';
+import CreditDisplay from '../CreditDisplay';
 
 const drawerWidth = 240;
 
@@ -132,13 +133,20 @@ const MainLayout = () => {
       </Box>
       <Divider />
       <Box sx={{ p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
-          Current Plan: <Chip size="small" label={subscription?.tier || 'Free'} color={
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+            Current Plan:
+          </Typography>
+          <Chip size="small" label={subscription?.tier || 'Free'} color={
             subscription?.tier === 'Pro' ? 'secondary' : 
             subscription?.tier === 'Enterprise' ? 'warning' : 
             'primary'
           } />
-        </Typography>
+        </Box>
+        
+        <Box sx={{ mb: 2 }}>
+          <CreditDisplay showIcon={false} size="small" />
+        </Box>
         
         {showUpgradeButton && (
           <Button
@@ -192,6 +200,14 @@ const MainLayout = () => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Ad Campaign Manager
           </Typography>
+          
+          {/* Credits display */}
+          <CreditDisplay 
+            showBuyButton={showUpgradeButton}
+            onBuyCredits={() => navigate('/subscriptions')}
+            size="small"
+            sx={{ mr: 2, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1, px: 1, py: 0.5 }}
+          />
           
           {/* Only show Google Ads button if user has appropriate tier */}
           {canUseGoogleAds ? (

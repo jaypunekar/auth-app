@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   Box,
   TextField,
@@ -14,9 +14,26 @@ import {
   Paper,
   Divider,
   Link,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
 } from '@mui/material';
-import { ImageSearch as ImageIcon, OpenInNew as OpenInNewIcon } from '@mui/icons-material';
+import { 
+  ImageSearch as ImageIcon, 
+  OpenInNew as OpenInNewIcon,
+  CreditCard as CreditCardIcon,
+  Refresh as RefreshIcon
+} from '@mui/icons-material';
 import { imageAPI } from '../../services/api';
+import CreditDisplay from '../CreditDisplay';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import axios from 'axios';
+
+// Create a context to trigger credit refresh in the CreditDisplay component
+export const CreditRefreshContext = React.createContext();
 
 const ImageGenerator = () => {
   const [prompt, setPrompt] = useState('');
@@ -24,11 +41,40 @@ const ImageGenerator = () => {
   const [error, setError] = useState(null);
   const [generatedImages, setGeneratedImages] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [creditsRemaining, setCreditsRemaining] = useState(null);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [creditRefreshTrigger, setCreditRefreshTrigger] = useState(0);
+  const { token } = useAuth();
+  const navigate = useNavigate();
 
   // Fetch existing generated images on component mount
   useEffect(() => {
     fetchGeneratedImages();
   }, []);
+
+  // Function to refresh user's credit count
+  const refreshCredits = async () => {
+    try {
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      const apiPath = normalizedBaseUrl.includes('/api') ? '/images/credits' : '/api/images/credits';
+      
+      const response = await axios.get(
+        `${normalizedBaseUrl}${apiPath}`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      setCreditsRemaining(response.data.credits);
+      // Trigger refresh of the CreditDisplay component
+      setCreditRefreshTrigger(prev => prev + 1);
+      
+      console.log('Credits refreshed:', response.data.credits);
+    } catch (err) {
+      console.error('Error refreshing credits:', err);
+    }
+  };
 
   const fetchGeneratedImages = async () => {
     try {
@@ -66,6 +112,18 @@ const ImageGenerator = () => {
       const response = await imageAPI.generateImage(prompt.trim());
 
       if (response.data.success) {
+        // Save the remaining credits
+        if (response.data.credits_remaining !== undefined) {
+          setCreditsRemaining(response.data.credits_remaining);
+          console.log('Credits remaining after generation:', response.data.credits_remaining);
+          
+          // Refresh the credit display component
+          setCreditRefreshTrigger(prev => prev + 1);
+        } else {
+          // If credits_remaining isn't included in response, refresh credits manually
+          await refreshCredits();
+        }
+        
         // Refresh the list of generated images
         await fetchGeneratedImages();
         setPrompt(''); // Clear the prompt
@@ -74,7 +132,13 @@ const ImageGenerator = () => {
       }
     } catch (err) {
       console.error('Error generating image:', err);
+      
+      // Handle insufficient credits error
+      if (err.response?.status === 402) {
+        setShowSubscriptionDialog(true);
+      } else {
       setError(err.response?.data?.detail || 'An error occurred while generating the image.');
+      }
     } finally {
       setLoading(false);
     }
@@ -91,15 +155,58 @@ const ImageGenerator = () => {
   const openImageInNewTab = (url) => {
     window.open(url, '_blank', 'noopener,noreferrer');
   };
+  
+  const handleUpgradeSubscription = () => {
+    setShowSubscriptionDialog(false);
+    navigate('/subscriptions');
+  };
 
   return (
+    <CreditRefreshContext.Provider value={{ refreshTrigger: creditRefreshTrigger }}>
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5">
         AI Image Generation
       </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <CreditDisplay 
+              showBuyButton={true}
+              onBuyCredits={() => navigate('/subscriptions')}
+              size="medium"
+            />
+            <IconButton 
+              size="small" 
+              onClick={refreshCredits} 
+              sx={{ ml: 1 }}
+              title="Refresh credits"
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Box>
+        
       <Typography variant="body2" color="text.secondary" paragraph>
         Enter a prompt to generate an image using Google's Gemini AI. Be creative - describe scenes, objects, styles, and moods.
+          <strong> Each image generation costs 2 credits.</strong>
       </Typography>
+        
+        {creditsRemaining !== null && (
+          <Alert 
+            severity="info" 
+            sx={{ mb: 2 }}
+            action={
+              <Button 
+                color="inherit" 
+                size="small" 
+                onClick={() => navigate('/subscriptions')}
+              >
+                Get More
+              </Button>
+            }
+          >
+            After your last image generation, you have {creditsRemaining} credits remaining.
+          </Alert>
+        )}
 
       <Paper sx={{ p: 3, mb: 4 }}>
         <Box component="form" noValidate>
@@ -247,7 +354,40 @@ const ImageGenerator = () => {
           </Box>
         </Box>
       )}
+        
+        {/* Insufficient Credits Dialog */}
+        <Dialog
+          open={showSubscriptionDialog}
+          onClose={() => setShowSubscriptionDialog(false)}
+          aria-labelledby="insufficient-credits-dialog-title"
+        >
+          <DialogTitle id="insufficient-credits-dialog-title">
+            Insufficient Credits
+          </DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" gutterBottom>
+              You don't have enough credits to generate an image. Each image generation costs 2 credits.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Upgrade to a Pro subscription to receive 250 credits or continue with your free account with 20 credits.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowSubscriptionDialog(false)} color="primary">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpgradeSubscription} 
+              variant="contained" 
+              color="primary"
+              startIcon={<CreditCardIcon />}
+            >
+              Upgrade Subscription
+            </Button>
+          </DialogActions>
+        </Dialog>
     </Box>
+    </CreditRefreshContext.Provider>
   );
 };
 
