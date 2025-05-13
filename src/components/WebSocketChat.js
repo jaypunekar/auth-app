@@ -18,6 +18,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import HistoryIcon from '@mui/icons-material/History';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import MessageFeedback from './Chat/MessageFeedback';
 
 const WebSocketChat = () => {
   const { token } = useAuth();
@@ -910,6 +911,11 @@ const WebSocketChat = () => {
             
             {/* Show tool calls if this message started tool calls processing */}
             {msg.toolCallsStart && session.currentToolCalls && renderToolCalls(session.currentToolCalls)}
+            
+            {/* Add message feedback for assistant messages only */}
+            {msg.role === 'assistant' && msg.id && (
+              <MessageFeedback messageId={msg.id} sessionId={session.sessionId} />
+            )}
           </Box>
         ))}
         

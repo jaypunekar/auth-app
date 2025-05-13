@@ -254,10 +254,24 @@ export const chatAPI = {
 
 // Feedback API
 export const feedbackAPI = {
-  submitFeedback: (messageId, isPositive) => 
-    api.post('/feedback', { message_id: messageId, is_positive: isPositive }),
+  submitFeedback: (messageId, feedbackType, value) => {
+    const data = { message_id: messageId };
+    
+    if (feedbackType === 'like') {
+      data.is_liked = value;
+      if (value) data.is_disliked = false; // Turn off dislike when liking
+    } else if (feedbackType === 'dislike') {
+      data.is_disliked = value;
+      if (value) data.is_liked = false; // Turn off like when disliking
+    } else if (feedbackType === 'star') {
+      data.is_starred = value;
+    }
+    
+    return api.post('/feedback', data);
+  },
   getLikedMessages: () => api.get('/feedback/liked'),
   getDislikedMessages: () => api.get('/feedback/disliked'),
+  getStarredMessages: () => api.get('/feedback/starred'),
   getAllFeedback: () => api.get('/feedback/all'),
   deleteFeedback: (feedbackId) => api.delete(`/feedback/${feedbackId}`),
 };
@@ -538,3 +552,23 @@ export {
 };
 
 export default api; 
+
+// Find the businessProfileAPI object and add this method
+
+export const businessProfileAPI = {
+  updateReportFrequency: async (frequencyHours) => {
+    try {
+      console.log('Updating business profile report frequency:', frequencyHours);
+      const response = await api.put(`/business-profile/report-frequency?frequency_hours=${frequencyHours}`);
+      console.log('Business profile report frequency updated:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating business profile report frequency:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+}; 

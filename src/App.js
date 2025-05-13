@@ -4,6 +4,8 @@ import { Box } from '@mui/material';
 import { SnackbarProvider } from 'notistack';
 import { useAuth } from './context/AuthContext';
 import { lazy, Suspense } from 'react';
+import { BusinessProfilePage } from './components/BusinessProfile';
+import FeedbackReview from './components/Chat/FeedbackReview';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -27,6 +29,7 @@ import FacebookAnalyzer from './pages/FacebookAnalyzer';
 import Subscriptions from './pages/Subscriptions';
 import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
 import DatabaseViewer from './pages/DatabaseViewer';
+import GoogleAdsAnalytics from './pages/GoogleAdsAnalytics';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -71,6 +74,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="chat" element={<ChatPage />} />
           <Route path="ws-chat" element={<WebSocketChat />} />
+          <Route path="feedback-review" element={<FeedbackReview />} />
           <Route path="campaigns/new" element={<AdCampaignForm />} />
           <Route path="campaigns/edit/:id" element={<AdCampaignForm />} />
           <Route path="campaigns/:id" element={<AdCampaignDetail />} />
@@ -81,6 +85,8 @@ function App() {
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="google-ads-funds-success" element={<GoogleAdsFundsSuccess />} />
           <Route path="database-viewer" element={<DatabaseViewer />} />
+          <Route path="business-profile" element={<BusinessProfilePage />} />
+          <Route path="google-ads-analytics" element={<GoogleAdsAnalytics />} />
         </Route>
 
         {/* Redirect to login for any other route */}

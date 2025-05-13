@@ -157,9 +157,10 @@ const Dashboard = () => {
   const [deletingCampaign, setDeletingCampaign] = useState(false);
 
   // New state variables for response review
-  const [reviewTab, setReviewTab] = useState(0); // 0 = Liked, 1 = Disliked
+  const [reviewTab, setReviewTab] = useState(0); // 0 = Liked, 1 = Disliked, 2 = Starred
   const [likedResponses, setLikedResponses] = useState([]);
   const [dislikedResponses, setDislikedResponses] = useState([]);
+  const [starredResponses, setStarredResponses] = useState([]); // New state for starred responses
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const [feedbackError, setFeedbackError] = useState(null);
 
@@ -289,14 +290,20 @@ const Dashboard = () => {
         setLoadingFeedback(true);
         setFeedbackError(null);
         
+        // Fetch liked responses
         const likedResponse = await feedbackAPI.getLikedMessages();
-        const dislikedResponse = await feedbackAPI.getDislikedMessages();
-        
         setLikedResponses(likedResponse.data);
+        
+        // Fetch disliked responses
+        const dislikedResponse = await feedbackAPI.getDislikedMessages();
         setDislikedResponses(dislikedResponse.data);
+        
+        // Fetch starred responses
+        const starredResponse = await feedbackAPI.getStarredMessages();
+        setStarredResponses(starredResponse.data);
       } catch (err) {
         console.error('Error fetching feedback:', err);
-        setFeedbackError('Failed to load feedback data');
+        setFeedbackError('Failed to load feedback messages');
       } finally {
         setLoadingFeedback(false);
       }
@@ -783,55 +790,69 @@ const Dashboard = () => {
 
   // Function to render feedback lists for both liked and disliked responses
   const renderFeedbackList = (feedbackList, type) => {
-    if (feedbackList.length === 0) {
+    if (loadingFeedback) {
       return (
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Typography variant="body1" color="textSecondary" gutterBottom>
-            You haven't {type === 'liked' ? 'liked' : 'disliked'} any responses yet.
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+          <CircularProgress />
         </Box>
       );
     }
     
+    if (feedbackError) {
     return (
-      <Grid container spacing={3}>
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {feedbackError}
+        </Alert>
+      );
+    }
+    
+    if (feedbackList.length === 0) {
+      return (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          No {type === 'liked' ? 'liked' : type === 'disliked' ? 'disliked' : 'starred'} responses yet.
+        </Alert>
+      );
+    }
+    
+    return (
+      <Box>
         {feedbackList.map((feedback) => (
-          <Grid item xs={12} key={feedback.id}>
-            <Card sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle1" sx={{ display: 'flex', alignItems: 'center' }}>
-                  {type === 'liked' ? (
-                    <ThumbUpIcon color="success" sx={{ mr: 1 }} />
-                  ) : (
-                    <ThumbDownIcon color="error" sx={{ mr: 1 }} />
-                  )}
-                  {type === 'liked' ? 'Helpful Response' : 'Unhelpful Response'}
+          <Card key={feedback.id} sx={{ mb: 2 }}>
+            <CardContent>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Message ID: {feedback.message_id}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {new Date(feedback.created_at).toLocaleString()}
-                </Typography>
-              </Box>
-              <Divider sx={{ mb: 2 }} />
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+              <Box sx={{ 
+                background: 'rgba(0,0,0,0.04)', 
+                p: 2, 
+                borderRadius: 1, 
+                mt: 1,
+                mb: 2
+              }}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {feedback.message?.content || 'Content not available'}
+                  {feedback.message ? feedback.message.content : 'Content not available'}
                 </ReactMarkdown>
               </Box>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Chip 
+                  size="small" 
+                  color={type === 'liked' ? 'primary' : type === 'disliked' ? 'error' : 'warning'}
+                  icon={type === 'liked' ? <ThumbUpIcon /> : type === 'disliked' ? <ThumbDownIcon /> : <StarIcon />}
+                  label={type === 'liked' ? 'Liked' : type === 'disliked' ? 'Disliked' : 'Starred'}
+                />
                 <Button 
+                  size="small" 
                   variant="outlined" 
                   color="error" 
-                  size="small"
-                  startIcon={<DeleteIcon />}
                   onClick={() => handleRemoveFeedback(feedback.id)}
                 >
-                  Remove Feedback
+                  Remove
                 </Button>
               </Box>
+            </CardContent>
             </Card>
-          </Grid>
         ))}
-      </Grid>
+      </Box>
     );
   };
 
@@ -1425,6 +1446,7 @@ const Dashboard = () => {
         <Tabs value={reviewTab} onChange={handleReviewTabChange} sx={{ mb: 3 }}>
           <Tab label="Liked Responses" icon={<ThumbUpIcon />} iconPosition="start" />
           <Tab label="Disliked Responses" icon={<ThumbDownIcon />} iconPosition="start" />
+          <Tab label="Starred Responses" icon={<StarIcon />} iconPosition="start" />
         </Tabs>
         
         {/* Liked/Disliked Responses Content */}
@@ -1438,8 +1460,10 @@ const Dashboard = () => {
           </Alert>
         ) : reviewTab === 0 ? (
           renderFeedbackList(likedResponses, 'liked')
-        ) : (
+        ) : reviewTab === 1 ? (
           renderFeedbackList(dislikedResponses, 'disliked')
+        ) : (
+          renderFeedbackList(starredResponses, 'starred')
         )}
       </TabPanel>
       

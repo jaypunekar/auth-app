@@ -24,13 +24,18 @@ import {
   Grid,
   Divider,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import MoneyIcon from '@mui/icons-material/Money';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
+import HistoryIcon from '@mui/icons-material/History';
 import googleAdsApi from '../services/googleAdsApi';
 
 const GoogleAdsLinkButton = () => {
@@ -47,7 +52,9 @@ const GoogleAdsLinkButton = () => {
     isLinked: false,
     customerId: '',
     connectionType: '',
-    availableFunds: 0
+    availableFunds: 0,
+    hasPreviousAccounts: false,
+    previousAccounts: []
   });
   const [linkStatus, setLinkStatus] = useState(null);
   const [activeStep, setActiveStep] = useState(() => {
@@ -59,6 +66,10 @@ const GoogleAdsLinkButton = () => {
   const [showAddFundsDialog, setShowAddFundsDialog] = useState(false);
   const [fundsAmount, setFundsAmount] = useState('');
   const [fundsLoading, setFundsLoading] = useState(false);
+  
+  // State for previously linked accounts
+  const [previouslyLinkedAccounts, setPreviouslyLinkedAccounts] = useState([]);
+  const [loadingPreviousAccounts, setLoadingPreviousAccounts] = useState(false);
   
   // State for the unlink confirmation dialogs
   const [unlinkConfirmStep, setUnlinkConfirmStep] = useState(0);
@@ -91,7 +102,9 @@ const GoogleAdsLinkButton = () => {
             isLinked: response.data.is_linked || false,
             customerId: response.data.customer_id || '',
             connectionType: response.data.connection_type || '',
-            availableFunds: response.data.available_funds || 0
+            availableFunds: response.data.available_funds || 0,
+            hasPreviousAccounts: response.data.has_previous_accounts || false,
+            previousAccounts: response.data.previous_accounts || []
           };
           
           // If status changed from linked to unlinked, reset the component and notify
@@ -121,6 +134,11 @@ const GoogleAdsLinkButton = () => {
           }
           
           setAccountStatus(newStatus);
+          
+          // Update the previously linked accounts if available from the response
+          if (newStatus.hasPreviousAccounts && newStatus.previousAccounts.length > 0) {
+            setPreviouslyLinkedAccounts(newStatus.previousAccounts);
+          }
         }
       } catch (error) {
         console.error('Error checking Google Ads account status:', error);
@@ -135,6 +153,40 @@ const GoogleAdsLinkButton = () => {
     
     return () => clearInterval(intervalId);
   }, [accountStatus.isLinked]);
+
+  // Fetch previously linked accounts when dialog opens
+  useEffect(() => {
+    if (open && !accountStatus.isLinked) {
+      fetchPreviouslyLinkedAccounts();
+    }
+  }, [open, accountStatus.isLinked]);
+
+  // Function to fetch previously linked accounts
+  const fetchPreviouslyLinkedAccounts = async () => {
+    try {
+      setLoadingPreviousAccounts(true);
+      const response = await googleAdsApi.getPreviouslyLinkedAccounts();
+      if (response && response.success && response.data.accounts) {
+        setPreviouslyLinkedAccounts(response.data.accounts);
+      }
+    } catch (error) {
+      console.error('Error fetching previously linked accounts:', error);
+    } finally {
+      setLoadingPreviousAccounts(false);
+    }
+  };
+
+  // Handle reconnecting to a previously linked account
+  const handleReconnectAccount = (accountId) => {
+    // Find the account in the list
+    const account = previouslyLinkedAccounts.find(acc => acc.id === accountId);
+    if (account) {
+      setCustomerId(account.customer_id);
+      setAccountType('existing');
+      // Move to the next step
+      handleNext();
+    }
+  };
 
   // Check link status if customerId is available and we're on the status step
   useEffect(() => {
@@ -203,7 +255,7 @@ const GoogleAdsLinkButton = () => {
     setSuccess('');
     // Don't reset activeStep if we're in the middle of waiting for an invitation
     if (!(activeStep === 2 && customerId && !accountStatus.isLinked && linkStatus && linkStatus.status === "PENDING")) {
-      setActiveStep(0);
+    setActiveStep(0);
     }
   };
 
@@ -250,35 +302,149 @@ const GoogleAdsLinkButton = () => {
         const response = await googleAdsApi.linkExistingAccount(customerId);
         
         if (response && response.success) {
-          setSuccess('Link request sent successfully! An invitation email has been sent to your registered email address with instructions on how to accept the invitation.');
-          setActiveStep(2); // Move to status check step
-          
-          // Save step to localStorage
-          localStorage.setItem('googleAds_activeStep', '2');
-          localStorage.setItem('googleAds_customerId', customerId);
+          // If the account is already active, we're done
+          if (response.data.status === "ACTIVE") {
+            setSuccess('Google Ads account successfully linked!');
+            setAccountStatus({
+              isLinked: true,
+              customerId: response.data.customer_id
+            });
+            
+            // Clear localStorage since we're now linked
+            localStorage.removeItem('googleAds_customerId');
+            localStorage.removeItem('googleAds_activeStep');
         } else {
-          setError('Failed to send link request. Please try again.');
+            // If pending, move to the next step and show instructions
+            setActiveStep(2);
+            // Save the current step to localStorage
+            localStorage.setItem('googleAds_activeStep', "2");
+            
+            // Set up to check status later
+            setLinkStatus(response.data);
+          }
+        } else {
+          // Check for the specific "already has an active account" error
+          const errorMessage = response?.message || '';
+          if (errorMessage.includes('already has an active Google Ads account')) {
+            // Extract the customer ID from the error message using regex
+            const idMatch = errorMessage.match(/ID: (\d+)/);
+            const existingId = idMatch ? idMatch[1] : null;
+            
+            setError(
+              <>
+                {errorMessage}
+                <Box mt={2}>
+                  <Button 
+                    variant="outlined" 
+                    color="error" 
+                    size="small"
+                    onClick={() => handleForceUnlink(existingId)}
+                  >
+                    Force Unlink Previous Account
+                  </Button>
+                </Box>
+              </>
+            );
+          } else {
+            setError(errorMessage || 'Failed to link Google Ads account. Please try again.');
+          }
         }
       }
     } catch (error) {
       console.error('Error linking Google Ads account:', error);
-      setError(error.response?.data?.detail || 'Failed to link Google Ads account. Please try again.');
+      // Check if the error is about already having an active account
+      const errorDetail = error.response?.data?.detail || '';
+      if (errorDetail.includes('already has an active Google Ads account')) {
+        // Extract the customer ID from the error message using regex
+        const idMatch = errorDetail.match(/ID: (\d+)/);
+        const existingId = idMatch ? idMatch[1] : null;
+        
+        setError(
+          <>
+            {errorDetail}
+            <Box mt={2}>
+              <Button 
+                variant="outlined" 
+                color="error" 
+                size="small"
+                onClick={() => handleForceUnlink(existingId)}
+              >
+                Force Unlink Previous Account
+              </Button>
+            </Box>
+          </>
+        );
+      } else {
+        setError(errorDetail || 'Failed to link Google Ads account. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a new function to force unlink a previous account
+  const handleForceUnlink = async (customerId) => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Call the API to force unlink the account
+      const response = await googleAdsApi.forceUnlinkAccount(customerId);
+      
+      if (response && response.success) {
+        setSuccess('Previous account successfully unlinked. You can now link your new account.');
+        // Refresh the account status
+        const statusResponse = await googleAdsApi.getAccountStatus();
+        if (statusResponse && statusResponse.data) {
+          setAccountStatus({
+            isLinked: statusResponse.data.is_linked || false,
+            customerId: statusResponse.data.customer_id || '',
+            connectionType: statusResponse.data.connection_type || '',
+            availableFunds: statusResponse.data.available_funds || 0,
+            hasPreviousAccounts: statusResponse.data.has_previous_accounts || false,
+            previousAccounts: statusResponse.data.previous_accounts || []
+          });
+        }
+        
+        // If we forced an unlink from the existing account flow, stay on the same step
+        if (activeStep === 1) {
+          // Do nothing, keep the user on step 1
+    } else {
+          // Otherwise, reset to step 0
+          setActiveStep(0);
+        }
+      } else {
+        setError(response?.message || 'Failed to unlink previous account. Please try again or contact support.');
+      }
+    } catch (error) {
+      console.error('Error force unlinking account:', error);
+      setError(error.response?.data?.detail || 'Failed to unlink previous account. Please try again or contact support.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleNext = () => {
-    // If we're creating a new account, we should skip the customer ID step
-    if (activeStep === 0 && accountType === 'new') {
-      handleLinkAccount(); // Directly create account when "new" is selected
-    } else {
-      const nextStep = activeStep + 1;
-      setActiveStep(nextStep);
-      // Save step to localStorage
-      localStorage.setItem('googleAds_activeStep', nextStep.toString());
+    if (activeStep === 0) {
+      // Before moving to step 1, validate the selection
+      if (accountType === 'existing') {
+        setActiveStep(1);
+        // Save the step to localStorage
+        localStorage.setItem('googleAds_activeStep', '1');
+      } else if (accountType === 'new') {
+        // For new accounts, we can directly submit
+        handleLinkAccount();
+      }
+    } else if (activeStep === 1) {
+      // Validate customer ID
+      if (!customerId || customerId.trim() === '') {
+        setError('Please enter a valid Customer ID');
+        return;
+      }
+      
+      // For existing accounts, submit the link request
+      handleLinkAccount();
     }
-    setError('');
   };
 
   const handleBack = () => {
@@ -337,9 +503,12 @@ const GoogleAdsLinkButton = () => {
     switch (step) {
       case 0:
         return (
-          <FormControl component="fieldset" sx={{ mb: 3, mt: 2 }}>
-            <FormLabel component="legend">Account Option</FormLabel>
+          <Box>
+            <FormControl component="fieldset" fullWidth>
+              <FormLabel component="legend">Account Type</FormLabel>
             <RadioGroup
+                aria-label="account-type"
+                name="account-type"
               value={accountType}
               onChange={handleAccountTypeChange}
             >
@@ -355,109 +524,149 @@ const GoogleAdsLinkButton = () => {
               />
             </RadioGroup>
           </FormControl>
+            
+            {/* Previously Linked Accounts Section */}
+            {previouslyLinkedAccounts.length > 0 && (
+              <Box mt={3} p={2} border={1} borderRadius={1} borderColor="divider">
+                <Typography variant="h6" gutterBottom>
+                  <HistoryIcon sx={{ verticalAlign: 'middle', mr: 1 }} />
+                  Previously Linked Accounts
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  You can reconnect to one of your previously linked accounts:
+                </Typography>
+                
+                {loadingPreviousAccounts ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
+                    <CircularProgress size={24} />
+                  </Box>
+                ) : (
+                  <List>
+                    {previouslyLinkedAccounts.map((account) => (
+                      <ListItem
+                        key={account.id}
+                        sx={{
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          mb: 1,
+                          bgcolor: 'background.paper'
+                        }}
+                      >
+                        <ListItemText
+                          primary={account.customer_id}
+                          secondary={
+                            <>
+                              {account.connection_type === 'created' ? 'Created account' : 'Linked account'}
+                              <br />
+                              Last linked: {new Date(account.created_at).toLocaleDateString()}
+                            </>
+                          }
+                        />
+                        <ListItemSecondaryAction>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="primary"
+                            onClick={() => handleReconnectAccount(account.id)}
+                          >
+                            Reconnect
+                          </Button>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
+            )}
+          </Box>
         );
       case 1:
         return (
-          <Box sx={{ my: 2 }}>
+          <Box>
+            {accountType === 'existing' && (
+              <Box>
+                <Typography variant="body1" gutterBottom>
+                  Enter your Google Ads Customer ID to link your account.
+                </Typography>
+                <Typography variant="body2" color="text.secondary" paragraph>
+                  You can find your Customer ID in your Google Ads account settings or in the top right corner of your Google Ads dashboard.
+                </Typography>
             <TextField
-              label="Google Ads Customer ID"
-              variant="outlined"
-              fullWidth
+                  label="Customer ID"
               value={customerId}
               onChange={handleCustomerIdChange}
-              placeholder="Format: 123-456-7890"
+                  fullWidth
+                  margin="normal"
+                  placeholder="e.g. 123-456-7890"
+                  helperText="Format: XXX-XXX-XXXX"
               required
-              helperText="Enter your Google Ads customer ID (e.g., 123-456-7890)"
-              sx={{ mb: 2 }}
-            />
+                />
+              </Box>
+            )}
+            {accountType === 'new' && (
+              <Box>
+                <Typography variant="body1" gutterBottom>
+                  We will create a new Google Ads account for you.
+                </Typography>
             <Typography variant="body2" color="text.secondary">
-              You can find your customer ID in the top right corner of your Google Ads account.
+                  The account will be created under our manager account and will be pre-configured for optimal performance.
             </Typography>
+              </Box>
+            )}
           </Box>
         );
       case 2:
         return (
-          <Box sx={{ my: 2 }}>
+          <Box>
             {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
                 <CircularProgress />
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  Checking link status...
+                </Typography>
               </Box>
-            ) : linkStatus ? (
-              <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
-                <Typography variant="subtitle1" gutterBottom>
-                  Link Status: <Chip 
-                    label={linkStatus.status} 
-                    color={
-                      linkStatus.status === "ACTIVE" ? "success" : 
-                      linkStatus.status === "PENDING" ? "warning" : 
-                      (linkStatus.status === "DECLINED" || linkStatus.status === "REFUSED") ? "error" :
-                      "default"
-                    }
-                    size="small"
-                    sx={{ ml: 1 }}
-                  />
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  {linkStatus.message}
-                </Typography>
-                {linkStatus.is_active || linkStatus.status === "ACTIVE" ? (
-                  <Alert severity="success" sx={{ mt: 2 }}>
-                    Google Ads account successfully linked!
-                  </Alert>
-                ) : linkStatus.status === "PENDING" ? (
-                  <>
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                      Please accept the invitation in your Google Ads account. An email with detailed instructions has been sent to your registered email address. Status will be checked automatically.
-                    </Alert>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button 
-                        variant="outlined" 
-                        color="primary" 
-                        onClick={handleCheckStatus}
-                        disabled={loading}
-                        startIcon={loading ? <CircularProgress size={20} /> : null}
-                      >
-                        Check Now
-                      </Button>
-                    </Box>
-                    <Typography variant="caption" sx={{ display: 'block', mt: 1, fontStyle: 'italic' }}>
-                      After accepting the invitation in Google Ads, it may take a few minutes for the status to update.
-                    </Typography>
-                  </>
-                ) : (linkStatus.status === "DECLINED" || linkStatus.status === "REFUSED") ? (
-                  <>
-                    <Alert severity="error" sx={{ mt: 2 }}>
-                      The invitation has been declined. You'll need to start over if you want to link this account.
-                    </Alert>
-                    <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                      <Button 
-                        variant="contained" 
-                        color="primary" 
-                        onClick={() => {
-                          // Reset the state
-                          setActiveStep(0);
-                          setCustomerId('');
-                          setLinkStatus(null);
-                          
-                          // Clear localStorage
-                          localStorage.removeItem('googleAds_customerId');
-                          localStorage.removeItem('googleAds_activeStep');
-                        }}
-                      >
-                        Start Over
-                      </Button>
-                    </Box>
-                  </>
-                ) : (
-                  <Alert severity="warning" sx={{ mt: 2 }}>
-                    Your account link status is {linkStatus.status}. Please try again or contact support.
+            ) : (
+              <Box>
+                {error && (
+                  <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
                   </Alert>
                 )}
-              </Paper>
-            ) : (
-              <Typography>
-                Checking link status...
+                {success && (
+                  <Alert severity="success" sx={{ mb: 2 }}>
+                    {success}
+                  </Alert>
+                )}
+                
+                {linkStatus && (
+                  <Box>
+                    <Typography variant="h6" gutterBottom>
+                  Link Status: {linkStatus.status}
+                </Typography>
+                    
+                    {linkStatus.status === "PENDING" && (
+                      <Box>
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                          The invitation has been sent to the Google Ads account. Please check your Google Ads account and accept the invitation.
+                        </Alert>
+                <Typography variant="body2" gutterBottom>
+                          Steps to accept the invitation:
+                </Typography>
+                        <ol>
+                          <li>Log in to your Google Ads account at <a href="https://ads.google.com" target="_blank" rel="noopener noreferrer">ads.google.com</a></li>
+                          <li>Click on the Tools &amp; Settings icon in the top right</li>
+                          <li>Go to Setup &gt; Access and security</li>
+                          <li>Look for pending invitations and accept the invitation from our account</li>
+                        </ol>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                          Once you accept the invitation, this page will update automatically.
               </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                )}
+              </Box>
             )}
           </Box>
         );
@@ -623,169 +832,159 @@ const GoogleAdsLinkButton = () => {
 
   return (
     <>
+      {accountStatus.isLinked ? (
+        // Show linked account info
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'flex-start', 
+            pl: 2, 
+            pr: 2, 
+            py: 1, 
+            borderRadius: 1, 
+            bgcolor: 'success.light',
+            color: 'white',
+            mb: 2
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+            <Typography variant="body1" sx={{ display: 'flex', alignItems: 'center' }}>
+              <CheckCircleIcon sx={{ mr: 1 }} /> 
+              Connected to Google Ads {accountStatus.customerId && `(${accountStatus.customerId})`}
+            </Typography>
       <Button
-        variant="contained"
-        color={accountStatus.isLinked ? "success" : "primary"}
-        startIcon={accountStatus.isLinked ? <CheckCircleIcon /> : <GoogleIcon />}
-        onClick={handleOpen}
-        sx={{ ml: 2 }}
+              variant="outlined" 
+              size="small" 
+              color="error"
+              onClick={handleUnlinkAccount}
+              startIcon={<LinkOffIcon />}
+              sx={{ 
+                bgcolor: 'white', 
+                '&:hover': {
+                  bgcolor: 'error.light',
+                  color: 'white'
+                } 
+              }}
       >
-        {accountStatus.isLinked ? 'Google Ads Linked' : 'Link Google Ads'}
+              Unlink
       </Button>
-
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>Google Ads Account</DialogTitle>
-        <DialogContent>
-          {accountStatus.isLinked ? (
-            <Box sx={{ my: 2 }}>
-              <Alert severity="success" sx={{ mb: 2 }}>
-                Your Google Ads account is linked
-              </Alert>
-              
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1">
-                    Customer ID: {accountStatus.customerId}
-                  </Typography>
-                </Grid>
-                
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1">
-                    Connection Type: 
-                    <Chip 
-                      label={accountStatus.connectionType === 'created' ? 'Created by Us' : 'Linked External Account'} 
-                      color={accountStatus.connectionType === 'created' ? 'secondary' : 'primary'} 
-                      size="small" 
-                      sx={{ ml: 1 }}
-                    />
-                  </Typography>
-                </Grid>
+          </Box>
                 
                 {accountStatus.connectionType === 'created' && (
-                  <Grid item xs={12}>
-                    <Paper elevation={1} sx={{ p: 2, mt: 1 }}>
-                      <Typography variant="subtitle1" gutterBottom>
-                        Available Funds
-                      </Typography>
-                      <Typography variant="h4" color="primary" gutterBottom>
-                        ${accountStatus.availableFunds.toFixed(2)}
+            <Box sx={{ mt: 1, width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2">
+                Available funds: ${accountStatus.availableFunds?.toFixed(2) || '0.00'}
                       </Typography>
                       <Button
-                        variant="contained"
-                        startIcon={<AddCircleIcon />}
+                variant="outlined" 
+                size="small"
                         onClick={handleOpenAddFundsDialog}
-                        sx={{ mt: 1 }}
+                startIcon={<MoneyIcon />}
+                sx={{ 
+                  bgcolor: 'white', 
+                  color: 'primary.main',
+                  '&:hover': {
+                    bgcolor: 'primary.light',
+                    color: 'white'
+                  } 
+                }}
                       >
                         Add Funds
                       </Button>
-                    </Paper>
-                  </Grid>
+            </Box>
                 )}
-                
-                  <Grid item xs={12} sx={{ mt: 2 }}>
+        </Box>
+      ) : (
+        // Show link button
+        <Box sx={{ mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleOpen}
+            startIcon={<GoogleIcon />}
+          >
+            Link Google Ads Account
+          </Button>
+          
+          {/* Button to view previously linked accounts */}
+          {accountStatus.hasPreviousAccounts && (
                     <Button
                       variant="outlined"
-                      color="error"
-                      startIcon={<LinkOffIcon />}
-                      onClick={handleUnlinkAccount}
-                      disabled={loading}
-                    >
-                      Unlink Account
+              color="primary"
+              onClick={() => {
+                handleOpen();
+                // Focus on the previously linked accounts section
+                setTimeout(() => {
+                  const element = document.getElementById('previously-linked-accounts');
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }, 300);
+              }}
+              startIcon={<HistoryIcon />}
+            >
+              View Previous Accounts
                     </Button>
-                    <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                    {accountStatus.connectionType === 'created' 
-                      ? 'This will notify our team to remove your account from our system.'
-                      : 'This will remove your account connection from our system.'}
-                    </Typography>
-                  </Grid>
-              </Grid>
+          )}
             </Box>
-          ) : (
-            <>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                To create Google Ads campaigns, you need to link your Google Ads account.
-                You can either create a new account or link an existing one.
-              </Typography>
+      )}
 
-              <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
-                {steps.map((label) => (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-
-              {getStepContent(activeStep)}
-
+      {/* Link account dialog */}
+      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {activeStep === 0 ? "Link Google Ads Account" : 
+           activeStep === 1 ? "Enter Google Ads Customer ID" :
+           "Link Status"}
+        </DialogTitle>
+        <DialogContent>
               {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                   {error}
                 </Alert>
               )}
-
               {success && (
                 <Alert severity="success" sx={{ mb: 2 }}>
                   {success}
                 </Alert>
               )}
-            </>
-          )}
+          
+          <Stepper activeStep={activeStep} sx={{ pt: 2, pb: 3 }}>
+            {steps.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+          
+          {getStepContent(activeStep)}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClose}>Close</Button>
-          {!accountStatus.isLinked && (
-            <>
-              {activeStep > 0 && (
-                <Button 
-                  onClick={handleBack}
-                  disabled={loading}
-                >
+          <Button onClick={handleClose} color="primary">
+            Close
+          </Button>
+          {activeStep > 0 && activeStep < 2 && (
+            <Button onClick={handleBack} color="primary">
                   Back
                 </Button>
               )}
-              {activeStep === steps.length - 1 ? (
-                <Button 
-                  onClick={handleCheckStatus}
-                  variant="contained" 
-                  color="primary"
-                  disabled={loading}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Check Status'}
-                </Button>
-              ) : activeStep === 1 ? (
-                <Button 
-                  onClick={handleLinkAccount} 
-                  variant="contained" 
-                  color="primary"
-                  disabled={loading || (accountType === 'existing' && !customerId)}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Link Account'}
-                </Button>
-              ) : (
+          {activeStep < 2 && !loading && (
                 <Button 
                   onClick={handleNext} 
                   variant="contained" 
                   color="primary"
-                  disabled={loading}
+              disabled={activeStep === 1 && (!customerId || customerId.trim() === '')}
                 >
-                  {activeStep === 0 && accountType === 'new' 
-                   ? (loading ? <CircularProgress size={24} /> : 'Create Account') 
-                   : 'Next'}
+              {activeStep === 1 ? "Link Account" : "Next"}
                 </Button>
-              )}
-            </>
           )}
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={notification.open}
-        autoHideDuration={6000}
-        onClose={handleCloseNotification}
-        message={notification.message}
-      />
+      {/* Previously Linked Accounts section with ID for scrolling */}
+      <div id="previously-linked-accounts"></div>
 
-      {/* Add Funds Dialog */}
+      {/* Add funds dialog */}
       <Dialog open={showAddFundsDialog} onClose={handleCloseAddFundsDialog} maxWidth="xs" fullWidth>
         <DialogTitle>Add Funds to Google Ads</DialogTitle>
         <DialogContent>
@@ -920,6 +1119,13 @@ const GoogleAdsLinkButton = () => {
           </>
         )}
       </Dialog>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        message={notification.message}
+      />
     </>
   );
 };

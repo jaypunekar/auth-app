@@ -1,14 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Box, TextField, Button, Typography, Paper, CircularProgress, Divider, Alert } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
+import BookmarksIcon from '@mui/icons-material/Bookmarks';
 import { useNavigate } from 'react-router-dom';
 import { useSnackbar } from 'notistack';
 import ReactMarkdown from 'react-markdown';
 import { apiClient } from '../../services/apiClient';
+import MessageFeedback from './MessageFeedback';
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  id?: number;
 }
 
 interface ImageGenerationRequest {
@@ -200,8 +203,25 @@ You can now monitor your campaign performance in your Google Ads account. Is the
     navigate('/campaigns');
   };
 
+  const handleViewFeedback = () => {
+    navigate('/feedback-review');
+  };
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', maxWidth: '800px', mx: 'auto', p: 2 }}>
+      {/* Add Feedback Review Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          size="small"
+          startIcon={<BookmarksIcon />}
+          onClick={handleViewFeedback}
+        >
+          View Saved Responses
+        </Button>
+      </Box>
+      
       <Paper elevation={3} sx={{ flex: 1, mb: 2, p: 2, overflowY: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
         {messages.map((message, index) => (
           <Box 
@@ -222,6 +242,9 @@ You can now monitor your campaign performance in your Google Ads account. Is the
             <Box sx={{ whiteSpace: 'pre-wrap' }}>
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </Box>
+            {message.role === 'assistant' && message.id && (
+              <MessageFeedback messageId={message.id} sessionId={threadId || ''} />
+            )}
           </Box>
         ))}
         {loading && (

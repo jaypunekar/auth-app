@@ -18,6 +18,23 @@ const googleAdsApi = {
     }
   },
 
+  // Get previously linked Google Ads accounts
+  getPreviouslyLinkedAccounts: async () => {
+    try {
+      console.log('Fetching previously linked Google Ads accounts...');
+      const response = await api.get('/google-ads/previously-linked-accounts');
+      console.log('Previously linked accounts response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting previously linked accounts:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
   // Link a Google Ads account
   linkAccount: async (data) => {
     try {
@@ -257,6 +274,117 @@ const googleAdsApi = {
       return response.data;
     } catch (error) {
       console.error('Error unlinking Google Ads account:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Force unlink a specific Google Ads account by customer ID
+  forceUnlinkAccount: async (customerId) => {
+    try {
+      console.log(`Force unlinking Google Ads account: ${customerId}`);
+      const response = await api.post('/google-ads/force-unlink-account', { 
+        customer_id: customerId 
+      });
+      console.log('Force unlink account response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error force unlinking Google Ads account:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+
+  // Schedule a performance report for a campaign
+  schedulePerformanceReport: async (campaignId, customerId, frequencyHours, endDate = null) => {
+    try {
+      console.log('Scheduling performance report for campaign:', campaignId);
+      const data = {
+        campaign_id: campaignId,
+        customer_id: customerId,
+        frequency_hours: frequencyHours,
+        end_date: endDate
+      };
+      
+      const response = await api.post('/google-ads/schedule-performance-report', data);
+      console.log('Performance report scheduled:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error scheduling performance report:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Get all performance report schedules
+  getPerformanceReportSchedules: async () => {
+    try {
+      console.log('Fetching performance report schedules...');
+      const response = await api.get('/google-ads/performance-report-schedules');
+      console.log('Performance report schedules:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting performance report schedules:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Update a performance report schedule
+  updatePerformanceReportSchedule: async (scheduleId, updateData) => {
+    try {
+      console.log('Updating performance report schedule:', scheduleId);
+      const response = await api.put(`/google-ads/performance-report-schedule/${scheduleId}`, updateData);
+      console.log('Performance report schedule updated:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating performance report schedule:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Delete a performance report schedule
+  deletePerformanceReportSchedule: async (scheduleId) => {
+    try {
+      console.log('Deleting performance report schedule:', scheduleId);
+      const response = await api.delete(`/google-ads/performance-report-schedule/${scheduleId}`);
+      console.log('Performance report schedule deleted:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error deleting performance report schedule:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Force reset account linking status in case of issues
+  resetAccountStatus: async () => {
+    try {
+      console.log('Force resetting Google Ads account status');
+      const response = await api.post('/google-ads/reset-account-status');
+      console.log('Account status reset response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error resetting account status:', error);
       if (error.response) {
         console.error('Error status:', error.response.status);
         console.error('Error data:', error.response.data);

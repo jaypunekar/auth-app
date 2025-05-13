@@ -38,6 +38,9 @@ import {
   ContactSupport as ContactSupportIcon,
   StarBorder as StarBorderIcon,
   ChatBubbleOutline as ChatBubbleOutlineIcon,
+  Business as BusinessIcon,
+  Bookmarks as BookmarksIcon,
+  Analytics as AnalyticsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -80,10 +83,13 @@ const MainLayout = () => {
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Chat with Assistant', icon: <ChatIcon />, path: '/chat' },
     { text: 'Real-time Chat', icon: <ChatBubbleOutlineIcon />, path: '/ws-chat' },
+    { text: 'Response Review', icon: <BookmarksIcon />, path: '/feedback-review' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
+    { text: 'Business Profile', icon: <BusinessIcon />, path: '/business-profile' },
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
     { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },
+    { text: 'Google Ads Analytics', icon: <AnalyticsIcon />, path: '/google-ads-analytics' },
     { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
   ];
 

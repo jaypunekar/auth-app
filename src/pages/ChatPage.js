@@ -223,18 +223,15 @@ const ChatMessage = ({ message }) => {
 
   // Handle feedback button click
   const handleFeedback = async (isPositive) => {
-    // Skip if not an assistant message
-    if (!isAssistant) return;
-    
-    // If already giving the same feedback, remove it
-    if (feedbackState.feedback === isPositive) {
+    // If feedback exists and matches the current action, remove it (toggling off)
+    if (
+      feedbackState.feedback !== null &&
+      feedbackState.feedback === isPositive
+    ) {
       try {
         setFeedbackState((prev) => ({ ...prev, loading: true }));
         
-        // If we have a feedback ID, delete it
-        if (feedbackState.feedbackId) {
           await feedbackAPI.deleteFeedback(feedbackState.feedbackId);
-        }
         
         setFeedbackState({
           loading: false,
@@ -250,7 +247,8 @@ const ChatMessage = ({ message }) => {
       try {
         setFeedbackState((prev) => ({ ...prev, loading: true }));
         
-        const response = await feedbackAPI.submitFeedback(message.id, isPositive);
+        const feedbackType = isPositive ? 'like' : 'dislike';
+        const response = await feedbackAPI.submitFeedback(message.id, feedbackType, true);
         
         setFeedbackState({
           loading: false,
