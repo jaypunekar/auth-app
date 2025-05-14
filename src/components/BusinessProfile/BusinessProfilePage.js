@@ -78,92 +78,92 @@ const BusinessProfilePage = () => {
 
     return (
       <>
-        <Card variant="outlined" sx={{ mb: 4 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" component="h2">
-                {profile.business_name}
-              </Typography>
-              <Tooltip title="Edit Profile">
-                <IconButton
-                  size="small"
-                  onClick={() => setIsEditing(true)}
-                  aria-label="edit"
-                >
-                  <EditIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-            
-            <Chip 
-              label={profile.industry} 
-              color="primary" 
-              size="small" 
-              sx={{ mb: 2 }} 
-            />
-            
-            {profile.report_frequency_hours && (
-              <Chip 
-                label={`Reports every ${profile.report_frequency_hours} ${profile.report_frequency_hours === 1 ? 'hour' : 'hours'}`}
-                color="secondary"
+      <Card variant="outlined" sx={{ mb: 4 }}>
+        <CardContent>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            <Typography variant="h6" component="h2">
+              {profile.business_name}
+            </Typography>
+            <Tooltip title="Edit Profile">
+              <IconButton
                 size="small"
-                sx={{ mb: 2, ml: 1 }}
-              />
+                onClick={() => setIsEditing(true)}
+                aria-label="edit"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          
+          <Chip 
+            label={profile.industry} 
+            color="primary" 
+            size="small" 
+            sx={{ mb: 2 }} 
+          />
+          
+            {profile.report_frequency_hours && (
+            <Chip 
+                label={`Reports every ${profile.report_frequency_hours} ${profile.report_frequency_hours === 1 ? 'hour' : 'hours'}`}
+              color="secondary"
+              size="small"
+              sx={{ mb: 2, ml: 1 }}
+            />
+          )}
+          
+          <Divider sx={{ my: 2 }} />
+          
+          <Stack spacing={2}>
+            {profile.website_url && (
+              <Box>
+                <Typography variant="subtitle2" fontWeight="bold">Website:</Typography>
+                <Typography variant="body2">
+                  <a href={profile.website_url.startsWith('http') ? profile.website_url : `https://${profile.website_url}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: 'none', color: theme.palette.primary.main }}
+                  >
+                    {profile.website_url}
+                  </a>
+                </Typography>
+              </Box>
             )}
             
-            <Divider sx={{ my: 2 }} />
-            
-            <Stack spacing={2}>
-              {profile.website_url && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">Website:</Typography>
-                  <Typography variant="body2">
-                    <a href={profile.website_url.startsWith('http') ? profile.website_url : `https://${profile.website_url}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{ textDecoration: 'none', color: theme.palette.primary.main }}
-                    >
-                      {profile.website_url}
-                    </a>
-                  </Typography>
-                </Box>
-              )}
-              
-              {profile.products && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">Products:</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {profile.products}
-                  </Typography>
-                </Box>
-              )}
-              
-              {profile.services && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">Services:</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {profile.services}
-                  </Typography>
-                </Box>
-              )}
-              
-              {profile.report_frequency_hours && (
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">Ad Performance Report Frequency:</Typography>
-                  <Typography variant="body2">
-                    Every {profile.report_frequency_hours} {profile.report_frequency_hours === 1 ? 'hour' : 'hours'}
-                  </Typography>
-                </Box>
-              )}
-              
-              {!profile.website_url && !profile.products && !profile.services && !profile.report_frequency_hours && (
-                <Typography variant="body2" fontStyle="italic">
-                  No business information provided.
+            {profile.products && (
+              <Box>
+                <Typography variant="subtitle2" fontWeight="bold">Products:</Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {profile.products}
                 </Typography>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
+              </Box>
+            )}
+            
+            {profile.services && (
+              <Box>
+                <Typography variant="subtitle2" fontWeight="bold">Services:</Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {profile.services}
+                </Typography>
+              </Box>
+            )}
+            
+              {profile.report_frequency_hours && (
+              <Box>
+                <Typography variant="subtitle2" fontWeight="bold">Ad Performance Report Frequency:</Typography>
+                <Typography variant="body2">
+                    Every {profile.report_frequency_hours} {profile.report_frequency_hours === 1 ? 'hour' : 'hours'}
+                </Typography>
+              </Box>
+            )}
+            
+              {!profile.website_url && !profile.products && !profile.services && !profile.report_frequency_hours && (
+              <Typography variant="body2" fontStyle="italic">
+                No business information provided.
+              </Typography>
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
 
         {/* AI Blog Suggestions Component */}
         <BlogSuggestions />
