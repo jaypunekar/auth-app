@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getToken } from '../utils/auth';
 
 // Get API base URL from environment variables or default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 // Set up axios with authentication header
 const apiClient = axios.create({
@@ -31,7 +31,7 @@ const businessProfileService = {
   // Create a new business profile
   createProfile: async (profileData) => {
     try {
-      const response = await apiClient.post('/business-profile', profileData);
+      const response = await apiClient.post('/business-profile/', profileData);
       return response.data;
     } catch (error) {
       console.error('Error creating business profile:', error);
@@ -42,7 +42,7 @@ const businessProfileService = {
   // Get the current user's business profile
   getProfile: async () => {
     try {
-      const response = await apiClient.get('/business-profile');
+      const response = await apiClient.get('/business-profile/');
       return response.data;
     } catch (error) {
       // If profile not found (404), return null instead of throwing
@@ -57,7 +57,7 @@ const businessProfileService = {
   // Update an existing business profile
   updateProfile: async (profileData) => {
     try {
-      const response = await apiClient.put('/business-profile', profileData);
+      const response = await apiClient.put('/business-profile/', profileData);
       return response.data;
     } catch (error) {
       console.error('Error updating business profile:', error);
@@ -68,7 +68,7 @@ const businessProfileService = {
   // Delete a business profile
   deleteProfile: async () => {
     try {
-      await apiClient.delete('/business-profile');
+      await apiClient.delete('/business-profile/');
       return true;
     } catch (error) {
       console.error('Error deleting business profile:', error);
@@ -85,6 +85,17 @@ const businessProfileService = {
       return response.data;
     } catch (error) {
       console.error('Error updating business profile report frequency:', error);
+      throw error;
+    }
+  },
+
+  // Get AI-generated blog suggestions based on business profile
+  getBlogSuggestions: async () => {
+    try {
+      const response = await apiClient.get('/business-profile/blog-suggestions');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting blog suggestions:', error);
       throw error;
     }
   }
