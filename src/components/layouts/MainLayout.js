@@ -82,7 +82,7 @@ const MainLayout = () => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Chat with Assistant', icon: <ChatIcon />, path: '/chat' },
-    { text: 'Real-time Chat', icon: <ChatBubbleOutlineIcon />, path: '/chat' },
+    { text: 'Real-time Chat', icon: <ChatBubbleOutlineIcon />, path: '/ws-chat' },
     { text: 'Response Review', icon: <BookmarksIcon />, path: '/feedback-review' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },

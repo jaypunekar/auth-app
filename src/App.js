@@ -18,6 +18,7 @@ import VerifyEmail from './pages/auth/VerifyEmail';
 import ResetPassword from './pages/auth/ResetPassword';
 import VerificationPage from './pages/auth/VerificationPage';
 import Dashboard from './pages/Dashboard';
+import ChatPage from './pages/ChatPage';
 import WebSocketChat from './components/WebSocketChat';
 import AdCampaignForm from './pages/AdCampaignForm';
 import AdCampaignDetail from './pages/AdCampaignDetail';
@@ -29,6 +30,7 @@ import Subscriptions from './pages/Subscriptions';
 import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
 import DatabaseViewer from './pages/DatabaseViewer';
 import GoogleAdsAnalytics from './pages/GoogleAdsAnalytics';
+import ContentCalendarPage from './pages/ContentCalendarPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -71,7 +73,8 @@ function App() {
           </ProtectedRoute>
         }>
           <Route index element={<Dashboard />} />
-          <Route path="chat" element={<WebSocketChat />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="ws-chat" element={<WebSocketChat />} />
           <Route path="feedback-review" element={<FeedbackReview />} />
           <Route path="campaigns/new" element={<AdCampaignForm />} />
           <Route path="campaigns/edit/:id" element={<AdCampaignForm />} />
@@ -85,6 +88,7 @@ function App() {
           <Route path="database-viewer" element={<DatabaseViewer />} />
           <Route path="business-profile" element={<BusinessProfilePage />} />
           <Route path="google-ads-analytics" element={<GoogleAdsAnalytics />} />
+          <Route path="content-calendar" element={<ContentCalendarPage />} />
         </Route>
 
         {/* Redirect to login for any other route */}

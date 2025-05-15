@@ -98,6 +98,30 @@ const businessProfileService = {
       console.error('Error getting blog suggestions:', error);
       throw error;
     }
+  },
+  
+  // Generate content calendar using OpenAI
+  generateContentCalendar: async (dateRange) => {
+    try {
+      console.log('Generating content calendar for date range:', dateRange);
+      const response = await apiClient.post('/business-profile/business-profile/content-calendar', dateRange);
+      console.log('Content calendar generated:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error generating content calendar:', error);
+      throw error;
+    }
+  },
+  
+  // Get content calendar data
+  getContentCalendar: async () => {
+    try {
+      const response = await apiClient.get('/business-profile/business-profile/content-calendar');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting content calendar:', error);
+      throw error;
+    }
   }
 };
 

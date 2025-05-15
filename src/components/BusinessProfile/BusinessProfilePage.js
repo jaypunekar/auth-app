@@ -19,6 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import businessProfileService from '../../services/businessProfileService';
 import BusinessProfileForm from './BusinessProfileForm';
 import BlogSuggestions from './BlogSuggestions';
+import ContentCalendarSetup from './ContentCalendarSetup';
 
 const BusinessProfilePage = () => {
   const [profile, setProfile] = useState(null);
@@ -178,6 +179,17 @@ const BusinessProfilePage = () => {
       </Typography>
       
       {renderProfileView()}
+
+      {/* Only show these components if the profile exists */}
+      {profile && (
+        <>
+          {/* AI Blog Suggestions Component */}
+          <BlogSuggestions />
+          
+          {/* Content Calendar Setup Component */}
+          <ContentCalendarSetup />
+        </>
+      )}
 
       {/* Edit Profile Drawer */}
       <Drawer
