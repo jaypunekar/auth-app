@@ -37,7 +37,6 @@ import MoneyIcon from '@mui/icons-material/Money';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import HistoryIcon from '@mui/icons-material/History';
 import googleAdsApi from '../services/googleAdsApi';
-import PreviouslyLinkedAccounts from './GoogleAds/PreviouslyLinkedAccounts';
 
 const GoogleAdsLinkButton = () => {
   const [open, setOpen] = useState(false);
@@ -79,9 +78,6 @@ const GoogleAdsLinkButton = () => {
   const [activeCampaignCount, setActiveCampaignCount] = useState(0);
   const [pauseCampaigns, setPauseCampaigns] = useState(false);
   const [unlinkSuccess, setUnlinkSuccess] = useState(false);
-
-  // Add a refresh trigger for PreviouslyLinkedAccounts
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const steps = ['Select Account Type', 'Enter Account ID', 'Link Status'];
 
@@ -292,70 +288,51 @@ const GoogleAdsLinkButton = () => {
           setSuccess(response.message);
           setAccountStatus({
             isLinked: true,
-            customerId: response.data.customer_id,
-            connectionType: response.data.connection_type || 'created',
-            availableFunds: response.data.available_funds || 0
+            customerId: response.data.customer_id
           });
           
           // Clear localStorage since we're now linked
           localStorage.removeItem('googleAds_customerId');
           localStorage.removeItem('googleAds_activeStep');
-          
-          // Refresh the previously linked accounts
-          setRefreshTrigger(prev => prev + 1);
         } else {
           setError('Failed to create Google Ads account. Please try again.');
         }
       } else {
         // Existing account
-        try {
-          // First try to force unlink any existing account to avoid the "already has an active account" error
-          await googleAdsApi.forceUnlinkAccount(accountStatus.customerId);
-          
-          // Now link the new account
-          const response = await googleAdsApi.linkExistingAccount(customerId);
-          
-          if (response && response.success) {
-            // If the account is already active, we're done
-            if (response.data.status === "ACTIVE") {
-              setSuccess('Google Ads account successfully linked!');
-              setAccountStatus({
-                isLinked: true,
-                customerId: response.data.customer_id,
-                connectionType: 'linked'
-              });
-              
-              // Clear localStorage since we're now linked
-              localStorage.removeItem('googleAds_customerId');
-              localStorage.removeItem('googleAds_activeStep');
-              
-              // Refresh the previously linked accounts
-              setRefreshTrigger(prev => prev + 1);
-            } else {
-              // If pending, move to the next step and show instructions
-              setActiveStep(2);
-              // Save the current step to localStorage
-              localStorage.setItem('googleAds_activeStep', "2");
-              
-              // Set up to check status later
-              setLinkStatus(response.data);
-            }
-          } else {
-            setError(response?.message || 'Failed to link Google Ads account. Please try again.');
+        const response = await googleAdsApi.linkExistingAccount(customerId);
+        
+        if (response && response.success) {
+          // If the account is already active, we're done
+          if (response.data.status === "ACTIVE") {
+            setSuccess('Google Ads account successfully linked!');
+            setAccountStatus({
+              isLinked: true,
+              customerId: response.data.customer_id
+            });
+            
+            // Clear localStorage since we're now linked
+            localStorage.removeItem('googleAds_customerId');
+            localStorage.removeItem('googleAds_activeStep');
+        } else {
+            // If pending, move to the next step and show instructions
+            setActiveStep(2);
+            // Save the current step to localStorage
+            localStorage.setItem('googleAds_activeStep', "2");
+            
+            // Set up to check status later
+            setLinkStatus(response.data);
           }
-        } catch (error) {
-          console.error('Error linking Google Ads account:', error);
-          
-          // Check if the error is about already having an active account
-          const errorDetail = error.response?.data?.detail || '';
-          if (errorDetail.includes('already has a linked Google Ads account')) {
+        } else {
+          // Check for the specific "already has an active account" error
+          const errorMessage = response?.message || '';
+          if (errorMessage.includes('already has an active Google Ads account')) {
             // Extract the customer ID from the error message using regex
-            const idMatch = errorDetail.match(/account: (\d+)/);
-            const existingId = idMatch ? idMatch[1] : accountStatus.customerId;
+            const idMatch = errorMessage.match(/ID: (\d+)/);
+            const existingId = idMatch ? idMatch[1] : null;
             
             setError(
               <>
-                {errorDetail}
+                {errorMessage}
                 <Box mt={2}>
                   <Button 
                     variant="outlined" 
@@ -369,18 +346,17 @@ const GoogleAdsLinkButton = () => {
               </>
             );
           } else {
-            setError(errorDetail || 'Failed to link Google Ads account. Please try again.');
+            setError(errorMessage || 'Failed to link Google Ads account. Please try again.');
           }
         }
       }
     } catch (error) {
       console.error('Error linking Google Ads account:', error);
-      
       // Check if the error is about already having an active account
       const errorDetail = error.response?.data?.detail || '';
-      if (errorDetail.includes('already has a linked Google Ads account')) {
+      if (errorDetail.includes('already has an active Google Ads account')) {
         // Extract the customer ID from the error message using regex
-        const idMatch = errorDetail.match(/account: (\d+)/);
+        const idMatch = errorDetail.match(/ID: (\d+)/);
         const existingId = idMatch ? idMatch[1] : null;
         
         setError(
@@ -413,7 +389,7 @@ const GoogleAdsLinkButton = () => {
       setError('');
       
       // Call the API to force unlink the account
-      const response = await googleAdsApi.forceUnlinkAccount(customerId || accountStatus.customerId);
+      const response = await googleAdsApi.forceUnlinkAccount(customerId);
       
       if (response && response.success) {
         setSuccess('Previous account successfully unlinked. You can now link your new account.');
@@ -430,13 +406,10 @@ const GoogleAdsLinkButton = () => {
           });
         }
         
-        // Refresh previously linked accounts
-        fetchPreviouslyLinkedAccounts();
-        
         // If we forced an unlink from the existing account flow, stay on the same step
         if (activeStep === 1) {
           // Do nothing, keep the user on step 1
-        } else {
+    } else {
           // Otherwise, reset to step 0
           setActiveStep(0);
         }
@@ -1146,41 +1119,6 @@ const GoogleAdsLinkButton = () => {
           </>
         )}
       </Dialog>
-
-      {/* Add PreviouslyLinkedAccounts component if user doesn't have an active account */}
-      {!accountStatus.isLinked && (
-        <PreviouslyLinkedAccounts 
-          onAccountLinked={(response) => {
-            // Update account status based on the linked account
-            if (response && response.success) {
-              setAccountStatus({
-                isLinked: true,
-                customerId: response.data.customer_id,
-                connectionType: 'linked'
-              });
-              
-              // Show success message
-              setNotification({
-                open: true,
-                message: 'Successfully reconnected to Google Ads account!'
-              });
-              
-              // Refresh account status
-              googleAdsApi.getAccountStatus().then(response => {
-                if (response && response.data) {
-                  setAccountStatus({
-                    isLinked: response.data.is_linked || false,
-                    customerId: response.data.customer_id || '',
-                    connectionType: response.data.connection_type || '',
-                    availableFunds: response.data.available_funds || 0
-                  });
-                }
-              });
-            }
-          }}
-          refreshTrigger={refreshTrigger}
-        />
-      )}
 
       <Snackbar
         open={notification.open}

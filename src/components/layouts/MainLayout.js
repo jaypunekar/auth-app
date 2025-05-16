@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -21,6 +21,8 @@ import {
   Tooltip,
   Badge,
   Chip,
+  CircularProgress,
+  Collapse
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -41,11 +43,18 @@ import {
   Business as BusinessIcon,
   Bookmarks as BookmarksIcon,
   Analytics as AnalyticsIcon,
+  History as HistoryIcon,
+  ExpandLess as ExpandLessIcon,
+  ExpandMore as ExpandMoreIcon,
+  Refresh as RefreshIcon,
+  MonetizationOn as MoneyIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
 import GoogleAdsCreationButton from '../GoogleAdsCreationButton';
+import GoogleAdsFundsButton from '../GoogleAdsFundsButton';
 import CreditDisplay from '../CreditDisplay';
+import googleAdsApi from '../../services/googleAdsApi';
 
 const drawerWidth = 240;
 
@@ -54,6 +63,13 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [previousAccountsOpen, setPreviousAccountsOpen] = useState(false);
+  const [previousAccounts, setPreviousAccounts] = useState([]);
+  const [loadingPreviousAccounts, setLoadingPreviousAccounts] = useState(false);
+  const [accountStatus, setAccountStatus] = useState({
+    isLinked: false,
+    customerId: ''
+  });
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -70,6 +86,72 @@ const MainLayout = () => {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const togglePreviousAccounts = () => {
+    setPreviousAccountsOpen(!previousAccountsOpen);
+    if (!previousAccountsOpen) {
+      fetchPreviouslyLinkedAccounts();
+    }
+  };
+
+  // Define fetchAccountStatus outside of useEffect so it can be called from other functions
+  const fetchAccountStatus = async () => {
+    try {
+      const response = await googleAdsApi.getAccountStatus();
+      if (response && response.data) {
+        setAccountStatus({
+          isLinked: response.data.is_linked || false,
+          customerId: response.data.customer_id || '',
+        });
+        if (response.data.has_previous_accounts && response.data.previous_accounts) {
+          setPreviousAccounts(response.data.previous_accounts);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Google Ads account status:', error);
+    }
+  };
+
+  // Fetch Google Ads account status and previously linked accounts
+  useEffect(() => {
+    // Call fetchAccountStatus on component mount
+    fetchAccountStatus();
+  }, []);
+
+  // Function to fetch previously linked accounts
+  const fetchPreviouslyLinkedAccounts = async () => {
+    try {
+      setLoadingPreviousAccounts(true);
+      const response = await googleAdsApi.getPreviouslyLinkedAccounts();
+      if (response && response.success && response.data.accounts) {
+        setPreviousAccounts(response.data.accounts);
+      }
+    } catch (error) {
+      console.error('Error fetching previously linked accounts:', error);
+    } finally {
+      setLoadingPreviousAccounts(false);
+    }
+  };
+
+  // Handle reconnecting to a previously linked account
+  const handleReconnectAccount = async (accountId) => {
+    try {
+      const account = previousAccounts.find(acc => acc.id === accountId);
+      if (!account) return;
+      
+      // Call the API to link this account
+      await googleAdsApi.linkExistingAccount(account.customer_id);
+      
+      // Refresh the account status
+      fetchAccountStatus();
+      
+      // Notify the user (this would be better with a toast notification)
+      alert(`Reconnection request sent for account ${account.customer_id}. Please check your email for further instructions.`);
+    } catch (error) {
+      console.error('Error reconnecting account:', error);
+      alert('Failed to reconnect account. Please try using the Google Ads Link button.');
+    }
   };
 
   // Check if user can use Google Ads
@@ -112,10 +194,42 @@ const MainLayout = () => {
         ))}
       </List>
       <Divider />
+      
+      {/* Google Ads Funds Section - Always shown */}
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
-            Google Ads
+            Google Ads Funds
+          </Typography>
+          {!canUseGoogleAds && (
+            <Tooltip title="This feature requires Pro or Enterprise subscription">
+              <LockIcon fontSize="small" color="action" />
+            </Tooltip>
+          )}
+        </Box>
+        
+        {canUseGoogleAds ? (
+          <GoogleAdsFundsButton />
+        ) : (
+          <Button 
+            variant="outlined" 
+            size="small" 
+            disabled 
+            fullWidth 
+            sx={{ mb: 1 }}
+            startIcon={<MoneyIcon />}
+          >
+            Add Funds
+          </Button>
+        )}
+      </Box>
+      <Divider />
+      
+      {/* Google Ads Account Section */}
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
+            Google Ads Account
           </Typography>
           {!canUseGoogleAds && (
             <Tooltip title="This feature requires Pro or Enterprise subscription">
@@ -135,6 +249,55 @@ const MainLayout = () => {
           >
             Create Google Ads
           </Button>
+        )}
+
+        {/* Previously Linked Accounts Section - Only show if there are some */}
+        {previousAccounts.length > 0 && (
+          <>
+            <ListItem button onClick={togglePreviousAccounts} sx={{ px: 0, py: 1 }}>
+              <ListItemIcon sx={{ minWidth: '30px' }}>
+                <HistoryIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Previously Linked Accounts" 
+                primaryTypographyProps={{ variant: 'body2', noWrap: true }} 
+              />
+              {previousAccountsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </ListItem>
+            <Collapse in={previousAccountsOpen} timeout="auto" unmountOnExit>
+              <Box sx={{ pl: 2, pr: 1 }}>
+                {loadingPreviousAccounts ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', my: 1 }}>
+                    <CircularProgress size={20} />
+                  </Box>
+                ) : (
+                  <List disablePadding dense>
+                    {previousAccounts.map((account) => (
+                      <ListItem 
+                        key={account.id} 
+                        sx={{ py: 0.5 }}
+                        secondaryAction={
+                          <IconButton 
+                            edge="end" 
+                            size="small" 
+                            onClick={() => handleReconnectAccount(account.id)}
+                            title="Reconnect Account"
+                          >
+                            <RefreshIcon fontSize="small" />
+                          </IconButton>
+                        }
+                      >
+                        <ListItemText 
+                          primary={`ID: ${account.customer_id}`}
+                          primaryTypographyProps={{ variant: 'caption', noWrap: true }} 
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                )}
+              </Box>
+            </Collapse>
+          </>
         )}
       </Box>
       <Divider />
