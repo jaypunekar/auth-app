@@ -865,12 +865,15 @@ const Dashboard = () => {
   };
 
   // Function to fetch campaign performance data
-  const fetchCampaignPerformance = async () => {
+  const fetchCampaignPerformance = async (timeRange = "all_time") => {
     try {
       setLoadingPerformance(true);
       setPerformanceError(null);
       
-      const response = await googleAdsAPI.getCampaignPerformance();
+      // Fetch real-time analytics with specified time range
+      const response = await googleAdsAPI.getCampaignPerformance({
+        time_range: timeRange
+      });
       
       if (response.data && response.data.success) {
         // Convert the array to an object keyed by campaign_id for easier lookup
@@ -920,7 +923,7 @@ const Dashboard = () => {
     if (performanceData.length === 0) {
       return (
         <Alert severity="info" sx={{ my: 2 }}>
-          No performance data available for the last 30 days.
+          No performance data available for the selected time period.
         </Alert>
       );
     }

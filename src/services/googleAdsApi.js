@@ -125,8 +125,10 @@ const googleAdsApi = {
   // Unlink a Google Ads account (only available for linked accounts, not created accounts)
   unlinkAccount: async (pauseCampaigns = false) => {
     try {
-      console.log(`Unlinking Google Ads account ${pauseCampaigns ? 'and pausing campaigns' : ''}`);
-      const response = await api.post('/google-ads/unlink-account', { pause_campaigns: pauseCampaigns });
+      console.log(`Unlinking Google Ads account, pause campaigns: ${pauseCampaigns}`);
+      const response = await api.post('/google-ads/unlink-account', { 
+        pause_campaigns: pauseCampaigns 
+      });
       console.log('Unlink account response:', response.data);
       return response.data;
     } catch (error) {
