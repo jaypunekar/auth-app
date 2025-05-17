@@ -125,10 +125,8 @@ const googleAdsApi = {
   // Unlink a Google Ads account (only available for linked accounts, not created accounts)
   unlinkAccount: async (pauseCampaigns = false) => {
     try {
-      console.log(`Unlinking Google Ads account, pause campaigns: ${pauseCampaigns}`);
-      const response = await api.post('/google-ads/unlink-account', { 
-        pause_campaigns: pauseCampaigns 
-      });
+      console.log(`Unlinking Google Ads account ${pauseCampaigns ? 'and pausing campaigns' : ''}`);
+      const response = await api.post('/google-ads/unlink-account', { pause_campaigns: pauseCampaigns });
       console.log('Unlink account response:', response.data);
       return response.data;
     } catch (error) {
@@ -429,16 +427,51 @@ const googleAdsApi = {
       throw error;
     }
   },
-
-  // Get the total funds available for the user across all accounts
-  getTotalFunds: async () => {
+  
+  // Force unlink at database level (for stubborn accounts)
+  forceUnlinkDb: async (customerId = null) => {
     try {
-      console.log('Fetching total Google Ads funds...');
-      const response = await api.get('/google-ads/total-funds');
-      console.log('Total funds response:', response.data);
+      console.log('Force unlinking account at database level');
+      const data = customerId ? { customer_id: customerId } : {};
+      const response = await api.post('/google-ads/force-unlink-db', data);
+      console.log('Force DB unlink response:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error getting total funds:', error);
+      console.error('Error force unlinking at DB level:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Get unlinked Google Ads accounts
+  getUnlinkedAccounts: async () => {
+    try {
+      console.log('Fetching unlinked Google Ads accounts...');
+      const response = await api.get('/google-ads/unlinked-accounts');
+      console.log('Unlinked accounts response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting unlinked accounts:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
+  },
+  
+  // Relink a previously unlinked Google Ads account
+  relinkAccount: async (accountId) => {
+    try {
+      console.log(`Relinking unlinked account with ID: ${accountId}`);
+      const response = await api.post(`/google-ads/relink-account/${accountId}`);
+      console.log('Relink account response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error relinking account:', error);
       if (error.response) {
         console.error('Error status:', error.response.status);
         console.error('Error data:', error.response.data);

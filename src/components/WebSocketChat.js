@@ -18,6 +18,10 @@ import ChatIcon from '@mui/icons-material/Chat';
 import HistoryIcon from '@mui/icons-material/History';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ReactMarkdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import remarkGfm from 'remark-gfm';
 import MessageFeedback from './Chat/MessageFeedback';
 
 const WebSocketChat = () => {
@@ -741,25 +745,151 @@ const WebSocketChat = () => {
     );
   };
 
+  // Add markdown styling
+  const markdownStyles = {
+    // Custom markdown rendering styles
+    container: {
+      width: '100%',
+      '& p': {
+        marginTop: '0.5rem',
+        marginBottom: '0.5rem',
+      },
+      '& h1, & h2, & h3, & h4, & h5, & h6': {
+        marginTop: '1rem',
+        marginBottom: '0.5rem',
+        fontWeight: 'bold',
+      },
+      '& h1': { fontSize: '1.7rem' },
+      '& h2': { fontSize: '1.5rem' },
+      '& h3': { fontSize: '1.3rem' },
+      '& h4': { fontSize: '1.1rem' },
+      '& h5': { fontSize: '1rem' },
+      '& h6': { fontSize: '0.9rem' },
+      '& ul, & ol': {
+        paddingLeft: '1.5rem',
+        marginTop: '0.5rem',
+        marginBottom: '0.5rem',
+      },
+      '& li': {
+        marginTop: '0.25rem',
+        marginBottom: '0.25rem',
+      },
+      '& code': {
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        padding: '0.2rem 0.3rem',
+        borderRadius: '3px',
+        fontFamily: 'monospace',
+        fontSize: '0.85em',
+      },
+      '& pre': {
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        padding: '0.75rem',
+        borderRadius: '4px',
+        overflow: 'auto',
+        '& code': {
+          backgroundColor: 'transparent',
+          padding: 0,
+        },
+      },
+      '& blockquote': {
+        borderLeft: '3px solid rgba(0, 0, 0, 0.2)',
+        paddingLeft: '1rem',
+        marginLeft: '0.5rem',
+        color: 'rgba(0, 0, 0, 0.7)',
+      },
+      '& a': {
+        color: 'primary.main',
+        textDecoration: 'none',
+        '&:hover': {
+          textDecoration: 'underline',
+        },
+      },
+      '& table': {
+        borderCollapse: 'collapse',
+        width: '100%',
+        marginTop: '0.5rem',
+        marginBottom: '0.5rem',
+      },
+      '& th, & td': {
+        border: '1px solid rgba(0, 0, 0, 0.1)',
+        padding: '0.5rem',
+        textAlign: 'left',
+      },
+      '& th': {
+        backgroundColor: 'rgba(0, 0, 0, 0.05)',
+        fontWeight: 'bold',
+      },
+      '& img': {
+        maxWidth: '100%',
+        borderRadius: '4px',
+        marginTop: '0.5rem',
+        marginBottom: '0.5rem',
+      },
+      '& hr': {
+        border: 'none',
+        borderBottom: '1px solid rgba(0, 0, 0, 0.1)',
+        margin: '1rem 0',
+      },
+    },
+  };
+
   // Update the renderMessageContent function
   const renderMessageContent = (content) => {
     const cleanedContent = cleanupMessage(content);
     const { text, images } = processMessageContent(cleanedContent);
     
+    // Define components for markdown rendering
+    const components = {
+      code({ node, inline, className, children, ...props }) {
+        const match = /language-(\w+)/.exec(className || '');
+        return !inline && match ? (
+          <SyntaxHighlighter
+            style={atomDark}
+            language={match[1]}
+            PreTag="div"
+            {...props}
+          >
+            {String(children).replace(/\n$/, '')}
+          </SyntaxHighlighter>
+        ) : (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      }
+    };
+    
     if (images.length === 0) {
-      // If no images, just return the text
-    return cleanedContent;
+      // If no images, render markdown with GitHub Flavored Markdown support
+      return (
+        <Box sx={markdownStyles.container}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={components}
+          >
+            {cleanedContent}
+          </ReactMarkdown>
+        </Box>
+      );
     }
     
     // If there are images, render the text with image cards inserted
     const parts = text.split(/\[IMAGE:(\d+)\]/);
     
     return (
-      <>
+      <Box sx={markdownStyles.container}>
         {parts.map((part, index) => {
           // Even indices are text
           if (index % 2 === 0) {
-            return part ? <Typography key={`text-${index}`} component="span">{part}</Typography> : null;
+            return part ? (
+              <ReactMarkdown
+                key={`text-${index}`}
+                remarkPlugins={[remarkGfm]}
+                components={components}
+              >
+                {part}
+              </ReactMarkdown>
+            ) : null;
           } 
           // Odd indices are image placeholders with the image index
           else {
@@ -767,7 +897,7 @@ const WebSocketChat = () => {
             return <ImageCard key={`image-${imageIndex}`} image={images[imageIndex]} />;
           }
         })}
-      </>
+      </Box>
     );
   };
 

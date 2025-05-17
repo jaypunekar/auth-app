@@ -46,13 +46,11 @@ import {
   History as HistoryIcon,
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  MonetizationOn as MoneyIcon
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
 import GoogleAdsCreationButton from '../GoogleAdsCreationButton';
-import GoogleAdsFundsButton from '../GoogleAdsFundsButton';
 import CreditDisplay from '../CreditDisplay';
 import googleAdsApi from '../../services/googleAdsApi';
 
@@ -194,42 +192,10 @@ const MainLayout = () => {
         ))}
       </List>
       <Divider />
-      
-      {/* Google Ads Funds Section - Always shown */}
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
-            Google Ads Funds
-          </Typography>
-          {!canUseGoogleAds && (
-            <Tooltip title="This feature requires Pro or Enterprise subscription">
-              <LockIcon fontSize="small" color="action" />
-            </Tooltip>
-          )}
-        </Box>
-        
-        {canUseGoogleAds ? (
-          <GoogleAdsFundsButton />
-        ) : (
-          <Button 
-            variant="outlined" 
-            size="small" 
-            disabled 
-            fullWidth 
-            sx={{ mb: 1 }}
-            startIcon={<MoneyIcon />}
-          >
-            Add Funds
-          </Button>
-        )}
-      </Box>
-      <Divider />
-      
-      {/* Google Ads Account Section */}
-      <Box sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-          <Typography variant="subtitle2" sx={{ color: 'text.secondary' }}>
-            Google Ads Account
+            Google Ads
           </Typography>
           {!canUseGoogleAds && (
             <Tooltip title="This feature requires Pro or Enterprise subscription">
