@@ -499,16 +499,46 @@ const WebSocketChat = () => {
       case 'tool_calls_started':
         try {
           const toolInfo = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
-          updatedSession.isProcessingToolCalls = true;
-          updatedSession.currentToolCalls = toolInfo.tool_calls.map(tool => ({
-            ...tool,
-            status: 'processing'
-          }));
+          console.log('Tool calls started, raw object:', toolInfo);
           
-          // Add system message for tool calls started
+          // Safely extract tool calls
+          const toolCalls = toolInfo.tool_calls || [];
+          updatedSession.isProcessingToolCalls = true;
+          
+          // Use a more defensive approach to extract function names
+          updatedSession.currentToolCalls = toolCalls.map(tool => {
+            // Log the actual structure of each tool
+            console.log('Tool object structure:', JSON.stringify(tool));
+            
+            // Check for function name in various possible locations
+            const functionName = tool.function?.name || 
+                                tool.function || 
+                                tool.name || 
+                                (typeof tool.function === 'object' ? 
+                                  tool.function.name || 'unknown function' : 
+                                  'unknown function');
+            
+            return {
+              ...tool,
+              function: functionName, // Make sure we store the name directly
+              status: 'processing'
+            };
+          });
+          
+          // Create a message that includes the names of the functions being called
+          const functionNames = updatedSession.currentToolCalls
+            .map(tool => `"${tool.function}"`)
+            .filter(name => name !== '"unknown function"' && name !== '"undefined"')
+            .join(', ');
+          
+          // Add system message for tool calls started with function names
           updatedSession.messages = [
             ...updatedSession.messages,
-            { role: 'system', content: `🔧 Processing ${toolInfo.tool_calls.length} tool call(s)...`, toolCallsStart: true }
+            { 
+              role: 'system', 
+              content: `🔧 Processing tools: ${functionNames || 'function calls'}`, 
+              toolCallsStart: true 
+            }
           ];
           console.log(`Started processing tool calls for session ${session.sessionId}`, toolInfo);
         } catch (error) {
@@ -519,13 +549,45 @@ const WebSocketChat = () => {
       case 'tool_call_completed':
         try {
           const completionInfo = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
+          console.log('Tool call completed, raw data:', completionInfo);
+          
           // Update the status of this specific tool call
           if (updatedSession.currentToolCalls) {
-            updatedSession.currentToolCalls = updatedSession.currentToolCalls.map(tool => 
-              tool.id === completionInfo.tool_call_id 
-                ? { ...tool, status: 'completed' } 
-                : tool
+            updatedSession.currentToolCalls = updatedSession.currentToolCalls.map(tool => {
+              // Check if this is the tool that completed
+              const isCompletedTool = tool.id === completionInfo.tool_call_id;
+              
+              // If this is the completed tool, update the function name if needed
+              if (isCompletedTool && completionInfo.function) {
+                // We got a clear function name from the completion info
+                return { ...tool, status: 'completed', function: completionInfo.function };
+              }
+              
+              return isCompletedTool ? { ...tool, status: 'completed' } : tool;
+            });
+
+            // Add completed function name to system messages if it's not an image generation
+            const completedTool = updatedSession.currentToolCalls.find(
+              tool => tool.id === completionInfo.tool_call_id
             );
+            
+            if (completedTool) {
+              const functionName = completedTool.function || completionInfo.function || 'unknown function';
+              
+              // Only add message if we have a valid function name and it's not image generation
+              if (functionName !== 'unknown function' && 
+                  functionName !== 'undefined' && 
+                  functionName !== 'generate_image') {
+                updatedSession.messages = [
+                  ...updatedSession.messages,
+                  { 
+                    role: 'system', 
+                    content: `✅ Function "${functionName}" completed`, 
+                    toolCallComplete: true 
+                  }
+                ];
+              }
+            }
           }
           console.log(`Tool call completed for session ${session.sessionId}`, completionInfo);
           
@@ -559,14 +621,32 @@ const WebSocketChat = () => {
         
       case 'tool_calls_completed':
         updatedSession.isProcessingToolCalls = false;
+        
+        // Create a summary of all completed tool calls
+        let toolSummary = "";
+        if (updatedSession.currentToolCalls && updatedSession.currentToolCalls.length > 0) {
+          const validTools = updatedSession.currentToolCalls.filter(
+            tool => tool.function && tool.function !== 'undefined' && tool.function !== 'unknown function'
+          );
+          
+          if (validTools.length > 0) {
+            const functionNames = validTools.map(tool => `"${tool.function}"`);
+            toolSummary = functionNames.join(', ');
+          }
+        }
+        
         // Keep the completed tool calls in the history
         updatedSession.toolCalls = [...(updatedSession.toolCalls || []), ...(updatedSession.currentToolCalls || [])];
         updatedSession.currentToolCalls = [];
         
-        // Add system message for tool calls completed
+        // Add system message for tool calls completed with function names
         updatedSession.messages = [
           ...updatedSession.messages,
-          { role: 'system', content: '✅ All tool calls completed', toolCallsEnd: true }
+          { 
+            role: 'system', 
+            content: `✅ All tools completed${toolSummary ? ': ' + toolSummary : ''}`, 
+            toolCallsEnd: true 
+          }
         ];
         console.log(`All tool calls completed for session ${session.sessionId}`);
         break;
@@ -905,6 +985,18 @@ const WebSocketChat = () => {
   const ToolCallDisplay = ({ toolCall }) => {
     const [expanded, setExpanded] = useState(false);
     
+    // Get a safe function name
+    const getFunctionName = () => {
+      if (!toolCall) return 'Unknown Function';
+      
+      const functionName = toolCall.function || 
+                          (toolCall.function_call?.name) || 
+                          (typeof toolCall.function === 'object' ? 
+                            toolCall.function.name : 'Unknown Function');
+                            
+      return functionName === 'undefined' ? 'Unknown Function' : functionName;
+    };
+    
     const getStatusIcon = () => {
       if (toolCall.status === 'completed') {
         return <CheckCircleOutlineIcon fontSize="small" color="success" />;
@@ -921,21 +1013,44 @@ const WebSocketChat = () => {
       setExpanded(!expanded);
     };
     
+    const functionName = getFunctionName();
+    
+    const functionNameStyle = {
+      fontWeight: toolCall.status === 'processing' ? 'bold' : 'normal',
+      color: toolCall.status === 'processing' ? '#1976d2' : 'inherit',
+      fontSize: toolCall.status === 'processing' ? '0.95rem' : '0.875rem'
+    };
+    
     return (
-      <Card variant="outlined" sx={{ mb: 1, backgroundColor: 'rgba(0,0,0,0.03)' }}>
+      <Card variant="outlined" sx={{ 
+        mb: 1, 
+        backgroundColor: toolCall.status === 'processing' 
+          ? 'rgba(25, 118, 210, 0.08)' 
+          : 'rgba(0,0,0,0.03)',
+        borderLeft: toolCall.status === 'processing' 
+          ? '3px solid #1976d2' 
+          : '1px solid rgba(0,0,0,0.12)'
+      }}>
         <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CodeIcon fontSize="small" color="primary" />
+              <CodeIcon fontSize="small" color={toolCall.status === 'processing' ? 'primary' : 'action'} />
               <Typography variant="subtitle2">
-                {toolCall.function}
+                {toolCall.status === 'processing' ? 'Calling function: ' : 'Function: '}
+                <span style={functionNameStyle}>
+                  {functionName}
+                </span>
               </Typography>
               <Chip 
                 size="small" 
                 label={toolCall.status} 
-                color={toolCall.status === 'completed' ? 'success' : 'default'}
+                color={toolCall.status === 'completed' ? 'success' : 'primary'}
                 icon={getStatusIcon()}
-                sx={{ height: 20, fontSize: '0.7rem' }}
+                sx={{ 
+                  height: 20, 
+                  fontSize: '0.7rem',
+                  fontWeight: toolCall.status === 'processing' ? 'bold' : 'normal'
+                }}
               />
             </Box>
             <IconButton size="small" onClick={toggleExpanded}>
@@ -948,7 +1063,7 @@ const WebSocketChat = () => {
               <Typography variant="caption" component="div" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap', fontSize: '0.7rem' }}>
                 {typeof toolCall.arguments === 'string' 
                   ? toolCall.arguments
-                  : JSON.stringify(toolCall.arguments, null, 2)}
+                  : JSON.stringify(toolCall.arguments || {}, null, 2)}
               </Typography>
             </Box>
           </Collapse>
@@ -1026,15 +1141,26 @@ const WebSocketChat = () => {
               p: 1, 
               mb: 1,
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: msg.toolCallsStart || msg.toolCallsEnd ? '95%' : '80%',
+              maxWidth: msg.toolCallsStart || msg.toolCallsEnd || msg.toolCallComplete ? '95%' : '80%',
               backgroundColor: msg.role === 'user' 
                 ? 'primary.light' 
-                : msg.toolCallsStart || msg.toolCallsEnd 
-                  ? 'grey.200' 
-                  : 'grey.100',
+                : msg.toolCallsStart 
+                  ? 'rgba(25, 118, 210, 0.08)'  // Light blue for tool call start
+                  : msg.toolCallComplete
+                    ? 'rgba(76, 175, 80, 0.08)'  // Light green for completed tool call
+                    : msg.toolCallsEnd
+                      ? 'rgba(76, 175, 80, 0.12)'  // Slightly darker green for all tools completed
+                      : 'grey.100',
               borderRadius: 2,
               color: msg.role === 'user' ? 'white' : 'text.primary',
-              width: msg.toolCallsStart ? '95%' : 'auto'
+              width: msg.toolCallsStart ? '95%' : 'auto',
+              borderLeft: msg.toolCallsStart 
+                ? '3px solid rgba(25, 118, 210, 0.5)'  // Blue border for tool calls start
+                : msg.toolCallComplete
+                  ? '3px solid rgba(76, 175, 80, 0.5)'  // Green border for completed tool call
+                  : msg.toolCallsEnd
+                    ? '3px solid rgba(76, 175, 80, 0.7)'  // Darker green border for all tools completed
+                    : 'none'
             }}
           >
             {renderMessageContent(msg.content)}
@@ -1058,12 +1184,13 @@ const WebSocketChat = () => {
               alignSelf: 'flex-start',
               maxWidth: '95%',
               width: '95%',
-              backgroundColor: 'grey.200',
-              borderRadius: 2
+              backgroundColor: 'rgba(25, 118, 210, 0.08)', // Light blue background
+              borderRadius: 2,
+              borderLeft: '3px solid #1976d2' // Blue left border
             }}
           >
-            <Typography variant="body2" sx={{ fontWeight: 500, mb: 1 }}>
-              Processing tool calls:
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: '#1976d2' }}>
+              Processing function calls:
             </Typography>
             {renderToolCalls(session.currentToolCalls)}
           </Box>
