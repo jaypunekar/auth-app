@@ -45,7 +45,39 @@ const ContentCalendarPage = () => {
         
         // Fetch content calendar data
         const calendarData = await businessProfileService.getContentCalendar();
-        setCalendarEntries(calendarData);
+        console.log("Calendar data:", calendarData);
+        
+        // Transform data if needed - handle both old and new format
+        let processedEntries = calendarData;
+        
+        // Check if we got the new format with arrays of headlines and descriptions
+        if (calendarData && calendarData.length > 0 && 
+            (calendarData[0].headlines || calendarData[0].descriptions)) {
+          // Convert to flat entries with one headline/description per entry
+          processedEntries = [];
+          calendarData.forEach(day => {
+            // Get the date
+            const date = day.date;
+            
+            // Make sure headlines and descriptions are arrays
+            const headlines = Array.isArray(day.headlines) ? day.headlines : [day.headline || ''];
+            const descriptions = Array.isArray(day.descriptions) ? day.descriptions : [day.description || ''];
+            
+            // For each headline, create an entry
+            headlines.forEach((headline, index) => {
+              // Cycle through descriptions if we have more headlines than descriptions
+              const description = descriptions[index % descriptions.length] || '';
+              processedEntries.push({
+                date,
+                headline,
+                description
+              });
+            });
+          });
+          console.log("Processed entries:", processedEntries);
+        }
+        
+        setCalendarEntries(processedEntries);
       } catch (err) {
         console.error('Error fetching content calendar data:', err);
         setError('Failed to fetch content calendar. Please try again later.');
@@ -72,10 +104,32 @@ const ContentCalendarPage = () => {
   const downloadCalendarCSV = () => {
     if (!calendarEntries || calendarEntries.length === 0) return;
     
+    // Group entries by date to handle multiple headlines per day
+    const entriesByDate = {};
+    calendarEntries.forEach(entry => {
+      if (!entriesByDate[entry.date]) {
+        entriesByDate[entry.date] = {
+          date: entry.date,
+          headlines: [],
+          descriptions: []
+        };
+      }
+      
+      // Add headline and description if not already in the arrays
+      if (!entriesByDate[entry.date].headlines.includes(entry.headline)) {
+        entriesByDate[entry.date].headlines.push(entry.headline);
+      }
+      if (!entriesByDate[entry.date].descriptions.includes(entry.description)) {
+        entriesByDate[entry.date].descriptions.push(entry.description);
+      }
+    });
+    
     // Create CSV content
-    const csvHeader = 'Date,Headline,Description\n';
-    const csvRows = calendarEntries.map(entry => {
-      return `${entry.date},"${entry.headline.replace(/"/g, '""')}","${entry.description.replace(/"/g, '""')}"`;
+    const csvHeader = 'Date,Headlines,Descriptions\n';
+    const csvRows = Object.values(entriesByDate).map(dayData => {
+      const headlines = dayData.headlines.map(h => h.replace(/"/g, '""')).join(' | ');
+      const descriptions = dayData.descriptions.map(d => d.replace(/"/g, '""')).join(' | ');
+      return `${dayData.date},"${headlines}","${descriptions}"`;
     }).join('\n');
     
     const csvContent = csvHeader + csvRows;
@@ -134,7 +188,10 @@ const ContentCalendarPage = () => {
           {/* Calendar days */}
           {days.map((day) => {
             const formattedDay = format(day, 'yyyy-MM-dd');
-            const dayEntry = currentMonthEntries.find(entry => entry.date === formattedDay);
+            // Get all entries for this day (might be multiple headlines now)
+            const dayEntries = currentMonthEntries.filter(entry => entry.date === formattedDay);
+            // Use the first entry for display or undefined if no entries
+            const dayEntry = dayEntries.length > 0 ? dayEntries[0] : undefined;
             
             return (
               <Grid item xs={12/7} key={day.toString()}>
@@ -170,8 +227,15 @@ const ContentCalendarPage = () => {
                       {format(day, 'd')}
                     </Typography>
                     
-                    {dayEntry && (
-                      <CalendarIcon fontSize="small" color="primary" />
+                    {dayEntries.length > 0 && (
+                      <Tooltip title={`${dayEntries.length} headline(s) available`}>
+                        <Box display="flex" alignItems="center">
+                          <Typography variant="caption" sx={{ mr: 0.5 }}>
+                            {dayEntries.length}
+                          </Typography>
+                          <CalendarIcon fontSize="small" color="primary" />
+                        </Box>
+                      </Tooltip>
                     )}
                   </Box>
                   
@@ -192,53 +256,66 @@ const ContentCalendarPage = () => {
                     flexDirection: 'column',
                     gap: 1
                   }}>
-                    {dayEntry ? (
-                      <Card 
-                        key={dayEntry.date} 
-                        sx={{ 
-                          mb: 1, 
-                          bgcolor: '#f5f5f5',
-                          border: '2px solid #4caf50',
-                          position: 'relative',
-                          minHeight: '80px',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <CardContent sx={{ p: 1, '&:last-child': { pb: 1 }, flexGrow: 1 }}>
-                          {/* Headline */}
-                          <Box sx={{ mt: 0.5, mb: 1 }}>
-                            <Typography 
-                              variant="subtitle2" 
-                              fontWeight="bold" 
-                              sx={{ 
-                                color: 'primary.main',
-                                fontSize: '0.85rem',
-                                lineHeight: 1.2,
-                                display: 'block',
-                                wordBreak: 'break-word'
-                              }}
-                            >
-                              {dayEntry.headline}
-                            </Typography>
-                          </Box>
+                    {dayEntries.length > 0 ? (
+                      dayEntries.slice(0, 1).map((entry, index) => (
+                        <Card 
+                          key={`${entry.date}-${index}`} 
+                          sx={{ 
+                            mb: 1, 
+                            bgcolor: '#f5f5f5',
+                            border: '2px solid #4caf50',
+                            position: 'relative',
+                            minHeight: '80px',
+                            display: 'flex',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          <CardContent sx={{ p: 1, '&:last-child': { pb: 1 }, flexGrow: 1 }}>
+                            {/* Show content count if multiple headlines */}
+                            {dayEntries.length > 1 && (
+                              <Box sx={{ mb: 1 }}>
+                                <Chip 
+                                  size="small" 
+                                  color="secondary" 
+                                  label={`${dayEntries.length} headlines`} 
+                                />
+                              </Box>
+                            )}
                           
-                          {/* Description */}
-                          <Box sx={{ mb: 1 }}>
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                fontSize: '0.75rem',
-                                lineHeight: 1.3,
-                                display: 'block',
-                                wordBreak: 'break-word'
-                              }}
-                            >
-                              {dayEntry.description}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
+                            {/* Headline */}
+                            <Box sx={{ mt: 0.5, mb: 1 }}>
+                              <Typography 
+                                variant="subtitle2" 
+                                fontWeight="bold" 
+                                sx={{ 
+                                  color: 'primary.main',
+                                  fontSize: '0.85rem',
+                                  lineHeight: 1.2,
+                                  display: 'block',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {entry.headline}
+                              </Typography>
+                            </Box>
+                            
+                            {/* Description */}
+                            <Box sx={{ mb: 1 }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  fontSize: '0.75rem',
+                                  lineHeight: 1.3,
+                                  display: 'block',
+                                  wordBreak: 'break-word'
+                                }}
+                              >
+                                {entry.description}
+                              </Typography>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      ))
                     ) : (
                       <Box
                         sx={{
