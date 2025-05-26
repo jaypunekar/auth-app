@@ -19,7 +19,7 @@ import { useSnackbar } from 'notistack';
 const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
   const initialFormState = {
     business_name: '',
-    industry: 'Healthcare',
+    industry: 'Technology',
     products: '',
     services: '',
     website_url: '',
@@ -36,7 +36,7 @@ const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
     if (existingProfile) {
       setFormData({
         business_name: existingProfile.business_name || '',
-        industry: existingProfile.industry || 'Healthcare',
+        industry: existingProfile.industry || 'Technology',
         products: existingProfile.products || '',
         services: existingProfile.services || '',
         website_url: existingProfile.website_url || '',
@@ -188,7 +188,53 @@ const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
               fullWidth
             >
               <MenuItem value="Healthcare">Healthcare</MenuItem>
-              {/* More industries can be added here in the future */}
+              <MenuItem value="Technology">Technology</MenuItem>
+              <MenuItem value="Finance">Finance</MenuItem>
+              <MenuItem value="Retail">Retail</MenuItem>
+              <MenuItem value="Education">Education</MenuItem>
+              <MenuItem value="Manufacturing">Manufacturing</MenuItem>
+              <MenuItem value="Real Estate">Real Estate</MenuItem>
+              <MenuItem value="Food & Beverage">Food & Beverage</MenuItem>
+              <MenuItem value="Automotive">Automotive</MenuItem>
+              <MenuItem value="Entertainment">Entertainment</MenuItem>
+              <MenuItem value="Consulting">Consulting</MenuItem>
+              <MenuItem value="Marketing">Marketing</MenuItem>
+              <MenuItem value="Construction">Construction</MenuItem>
+              <MenuItem value="Energy">Energy</MenuItem>
+              <MenuItem value="Telecommunications">Telecommunications</MenuItem>
+              <MenuItem value="Transportation">Transportation</MenuItem>
+              <MenuItem value="Agriculture">Agriculture</MenuItem>
+              <MenuItem value="Legal">Legal</MenuItem>
+              <MenuItem value="Non-Profit">Non-Profit</MenuItem>
+              <MenuItem value="Government">Government</MenuItem>
+              <MenuItem value="Hospitality">Hospitality</MenuItem>
+              <MenuItem value="Fitness">Fitness</MenuItem>
+              <MenuItem value="Beauty">Beauty</MenuItem>
+              <MenuItem value="Travel">Travel</MenuItem>
+              <MenuItem value="Insurance">Insurance</MenuItem>
+              <MenuItem value="Publishing">Publishing</MenuItem>
+              <MenuItem value="Pharmaceuticals">Pharmaceuticals</MenuItem>
+              <MenuItem value="Textiles">Textiles</MenuItem>
+              <MenuItem value="Sports">Sports</MenuItem>
+              <MenuItem value="Art & Design">Art & Design</MenuItem>
+              <MenuItem value="Media">Media</MenuItem>
+              <MenuItem value="Logistics">Logistics</MenuItem>
+              <MenuItem value="Security">Security</MenuItem>
+              <MenuItem value="Electronics">Electronics</MenuItem>
+              <MenuItem value="Software">Software</MenuItem>
+              <MenuItem value="E-commerce">E-commerce</MenuItem>
+              <MenuItem value="Gaming">Gaming</MenuItem>
+              <MenuItem value="Aerospace">Aerospace</MenuItem>
+              <MenuItem value="Mining">Mining</MenuItem>
+              <MenuItem value="Fashion">Fashion</MenuItem>
+              <MenuItem value="Music">Music</MenuItem>
+              <MenuItem value="Photography">Photography</MenuItem>
+              <MenuItem value="Cleaning Services">Cleaning Services</MenuItem>
+              <MenuItem value="Pet Services">Pet Services</MenuItem>
+              <MenuItem value="Home Services">Home Services</MenuItem>
+              <MenuItem value="Personal Services">Personal Services</MenuItem>
+              <MenuItem value="Professional Services">Professional Services</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
             </TextField>
 
             <TextField
