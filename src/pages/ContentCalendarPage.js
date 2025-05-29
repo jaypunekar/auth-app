@@ -13,12 +13,30 @@ import {
   IconButton,
   Divider,
   Tooltip,
+  Tabs,
+  Tab,
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemSecondaryAction,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   ArrowForward as ArrowForwardIcon,
   CalendarMonth as CalendarIcon,
   Download as DownloadIcon,
+  Save as SaveIcon,
+  BookmarkBorder as BookmarkIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isToday, isSameMonth, parseISO } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -28,9 +46,13 @@ const ContentCalendarPage = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarEntries, setCalendarEntries] = useState([]);
+  const [savedCalendarEntries, setSavedCalendarEntries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [businessProfile, setBusinessProfile] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [editDialog, setEditDialog] = useState({ open: false, entry: null });
 
   useEffect(() => {
     // Fetch business profile and calendar entries
@@ -78,6 +100,9 @@ const ContentCalendarPage = () => {
         }
         
         setCalendarEntries(processedEntries);
+        
+        // Also load saved entries
+        await loadSavedEntries();
       } catch (err) {
         console.error('Error fetching content calendar data:', err);
         setError('Failed to fetch content calendar. Please try again later.');
@@ -88,6 +113,97 @@ const ContentCalendarPage = () => {
     
     fetchData();
   }, [currentDate]);
+
+  const loadSavedEntries = async () => {
+    try {
+      const saved = await businessProfileService.getSavedContentCalendarEntries();
+      setSavedCalendarEntries(saved);
+    } catch (error) {
+      console.error('Failed to load saved calendar entries:', error);
+    }
+  };
+
+  const saveCurrentCalendar = async () => {
+    setLoading(true);
+    try {
+      await businessProfileService.saveCurrentContentCalendar();
+      await loadSavedEntries(); // Refresh saved entries
+      setSnackbar({
+        open: true,
+        message: 'Content calendar saved successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to save calendar:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to save calendar. Please try again.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditEntry = (entry) => {
+    setEditDialog({ open: true, entry: { ...entry } });
+  };
+
+  const handleSaveEdit = async () => {
+    const { entry } = editDialog;
+    if (!entry) return;
+
+    try {
+      await businessProfileService.updateContentCalendarEntry(entry.id, {
+        date: entry.date,
+        headline: entry.headline,
+        description: entry.description
+      });
+      await loadSavedEntries();
+      setEditDialog({ open: false, entry: null });
+      setSnackbar({
+        open: true,
+        message: 'Entry updated successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to update entry:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update entry. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleDeleteEntry = async (entryId) => {
+    if (!window.confirm('Are you sure you want to delete this entry?')) return;
+
+    try {
+      await businessProfileService.deleteContentCalendarEntry(entryId);
+      await loadSavedEntries();
+      setSnackbar({
+        open: true,
+        message: 'Entry deleted successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to delete entry:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to delete entry. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handlePreviousMonth = () => {
     const newDate = new Date(currentDate);
@@ -353,20 +469,102 @@ const ContentCalendarPage = () => {
     );
   };
 
+  const renderSavedEntries = () => {
+    if (savedCalendarEntries.length === 0) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="body1" gutterBottom>
+            No saved content calendar entries yet.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Generate a calendar and save it to see entries here.
+          </Typography>
+        </Box>
+      );
+    }
+
+    // Group entries by date
+    const entriesByDate = {};
+    savedCalendarEntries.forEach(entry => {
+      if (!entriesByDate[entry.date]) {
+        entriesByDate[entry.date] = [];
+      }
+      entriesByDate[entry.date].push(entry);
+    });
+
+    return (
+      <Box>
+        {Object.entries(entriesByDate)
+          .sort(([a], [b]) => new Date(a) - new Date(b))
+          .map(([date, entries]) => (
+            <Paper key={date} sx={{ mb: 2, p: 2 }}>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <EventIcon color="primary" />
+                {format(parseISO(date), 'EEEE, MMMM d, yyyy')}
+              </Typography>
+              <List dense>
+                {entries.map((entry) => (
+                  <ListItem key={entry.id} sx={{ bgcolor: 'background.default', borderRadius: 1, mb: 1 }}>
+                    <ListItemIcon>
+                      <CalendarIcon color="primary" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={entry.headline}
+                      secondary={entry.description}
+                      primaryTypographyProps={{ fontWeight: 500 }}
+                    />
+                    <ListItemSecondaryAction>
+                      <IconButton 
+                        edge="end" 
+                        onClick={() => handleEditEntry(entry)}
+                        sx={{ mr: 1 }}
+                      >
+                        <EditIcon />
+                      </IconButton>
+                      <IconButton 
+                        edge="end" 
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          ))
+        }
+      </Box>
+    );
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1">
           Content Calendar
         </Typography>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          onClick={downloadCalendarCSV}
-          disabled={!calendarEntries || calendarEntries.length === 0}
-        >
-          Export to CSV
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          {tabValue === 0 && calendarEntries.length > 0 && (
+            <Button
+              variant="contained"
+              startIcon={<SaveIcon />}
+              onClick={saveCurrentCalendar}
+              disabled={loading}
+            >
+              Save Calendar
+            </Button>
+          )}
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={downloadCalendarCSV}
+            disabled={!calendarEntries || calendarEntries.length === 0}
+          >
+            Export to CSV
+          </Button>
+        </Box>
       </Box>
 
       {error && (
@@ -375,49 +573,81 @@ const ContentCalendarPage = () => {
         </Alert>
       )}
 
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Button 
-            variant="outlined" 
-            startIcon={<ArrowBackIcon />} 
-            onClick={handlePreviousMonth}
-          >
-            Previous
-          </Button>
-          <Typography variant="h5">
-            {format(currentDate, 'MMMM yyyy')}
-          </Typography>
-          <Button 
-            variant="outlined" 
-            endIcon={<ArrowForwardIcon />} 
-            onClick={handleNextMonth}
-          >
-            Next
-          </Button>
-        </Box>
+      <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+        <Tab 
+          label={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <CalendarIcon fontSize="small" />
+              Current Calendar
+            </Box>
+          } 
+        />
+        <Tab 
+          label={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <BookmarkIcon fontSize="small" />
+              Saved Entries ({savedCalendarEntries.length})
+            </Box>
+          } 
+        />
+      </Tabs>
 
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : calendarEntries.length === 0 ? (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography variant="body1" gutterBottom>
-              No content calendar has been generated yet.
+      {/* Current Calendar Tab */}
+      {tabValue === 0 && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Button 
+              variant="outlined" 
+              startIcon={<ArrowBackIcon />} 
+              onClick={handlePreviousMonth}
+            >
+              Previous
+            </Button>
+            <Typography variant="h5">
+              {format(currentDate, 'MMMM yyyy')}
             </Typography>
             <Button 
-              variant="contained" 
-              color="primary" 
-              onClick={() => navigate('/business-profile')}
-              sx={{ mt: 2 }}
+              variant="outlined" 
+              endIcon={<ArrowForwardIcon />} 
+              onClick={handleNextMonth}
             >
-              Generate Calendar
+              Next
             </Button>
           </Box>
-        ) : (
-          renderCalendar()
-        )}
-      </Paper>
+
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : calendarEntries.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}>
+              <Typography variant="body1" gutterBottom>
+                No content calendar has been generated yet.
+              </Typography>
+              <Button 
+                variant="contained" 
+                color="primary" 
+                onClick={() => navigate('/business-profile')}
+                sx={{ mt: 2 }}
+              >
+                Generate Calendar
+              </Button>
+            </Box>
+          ) : (
+            renderCalendar()
+          )}
+        </Paper>
+      )}
+
+      {/* Saved Entries Tab */}
+      {tabValue === 1 && (
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h5" gutterBottom>
+            Your Saved Content Calendar Entries
+          </Typography>
+          {renderSavedEntries()}
+        </Paper>
+      )}
 
       {/* Business Profile Info Card */}
       {businessProfile && (
@@ -440,6 +670,72 @@ const ContentCalendarPage = () => {
           )}
         </Paper>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog 
+        open={editDialog.open} 
+        onClose={() => setEditDialog({ open: false, entry: null })}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Edit Content Calendar Entry</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            label="Date"
+            type="date"
+            value={editDialog.entry?.date || ''}
+            onChange={(e) => setEditDialog({
+              ...editDialog,
+              entry: { ...editDialog.entry, date: e.target.value }
+            })}
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+          />
+          <TextField
+            fullWidth
+            label="Headline"
+            value={editDialog.entry?.headline || ''}
+            onChange={(e) => setEditDialog({
+              ...editDialog,
+              entry: { ...editDialog.entry, headline: e.target.value }
+            })}
+            margin="normal"
+          />
+          <TextField
+            fullWidth
+            label="Description"
+            value={editDialog.entry?.description || ''}
+            onChange={(e) => setEditDialog({
+              ...editDialog,
+              entry: { ...editDialog.entry, description: e.target.value }
+            })}
+            margin="normal"
+            multiline
+            rows={4}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialog({ open: false, entry: null })}>
+            Cancel
+          </Button>
+          <Button onClick={handleSaveEdit} variant="contained">
+            Save Changes
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

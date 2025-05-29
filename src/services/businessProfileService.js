@@ -122,6 +122,159 @@ const businessProfileService = {
       console.error('Error getting content calendar:', error);
       throw error;
     }
+  },
+
+  // =============================================================================
+  // BLOG SUGGESTIONS CRUD OPERATIONS
+  // =============================================================================
+
+  // Save multiple blog suggestions to database
+  saveBlogSuggestionsBulk: async (suggestions) => {
+    try {
+      const response = await apiClient.post('/business-profile/business-profile/blog-suggestions/save-bulk', {
+        suggestions: suggestions
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error saving blog suggestions:', error);
+      throw error;
+    }
+  },
+
+  // Get all saved blog suggestions
+  getSavedBlogSuggestions: async () => {
+    try {
+      const response = await apiClient.get('/business-profile/business-profile/blog-suggestions/saved');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting saved blog suggestions:', error);
+      throw error;
+    }
+  },
+
+  // Create a new blog suggestion
+  createBlogSuggestion: async (suggestionData) => {
+    try {
+      const response = await apiClient.post('/business-profile/business-profile/blog-suggestions', suggestionData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating blog suggestion:', error);
+      throw error;
+    }
+  },
+
+  // Get a specific blog suggestion
+  getBlogSuggestion: async (suggestionId) => {
+    try {
+      const response = await apiClient.get(`/business-profile/business-profile/blog-suggestions/${suggestionId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting blog suggestion:', error);
+      throw error;
+    }
+  },
+
+  // Update a blog suggestion
+  updateBlogSuggestion: async (suggestionId, updateData) => {
+    try {
+      const response = await apiClient.put(`/business-profile/business-profile/blog-suggestions/${suggestionId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating blog suggestion:', error);
+      throw error;
+    }
+  },
+
+  // Delete a blog suggestion
+  deleteBlogSuggestion: async (suggestionId) => {
+    try {
+      await apiClient.delete(`/business-profile/business-profile/blog-suggestions/${suggestionId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting blog suggestion:', error);
+      throw error;
+    }
+  },
+
+  // =============================================================================
+  // CONTENT CALENDAR CRUD OPERATIONS
+  // =============================================================================
+
+  // Save the current generated content calendar
+  saveCurrentContentCalendar: async () => {
+    try {
+      const response = await apiClient.post('/business-profile/business-profile/content-calendar/save-current');
+      return response.data;
+    } catch (error) {
+      console.error('Error saving current content calendar:', error);
+      throw error;
+    }
+  },
+
+  // Get all saved content calendar entries
+  getSavedContentCalendarEntries: async () => {
+    try {
+      const response = await apiClient.get('/business-profile/business-profile/content-calendar/saved');
+      return response.data;
+    } catch (error) {
+      console.error('Error getting saved content calendar entries:', error);
+      throw error;
+    }
+  },
+
+  // Create a new content calendar entry
+  createContentCalendarEntry: async (entryData) => {
+    try {
+      const response = await apiClient.post('/business-profile/business-profile/content-calendar/entries', entryData);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating content calendar entry:', error);
+      throw error;
+    }
+  },
+
+  // Get a specific content calendar entry
+  getContentCalendarEntry: async (entryId) => {
+    try {
+      const response = await apiClient.get(`/business-profile/business-profile/content-calendar/entries/${entryId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting content calendar entry:', error);
+      throw error;
+    }
+  },
+
+  // Update a content calendar entry
+  updateContentCalendarEntry: async (entryId, updateData) => {
+    try {
+      const response = await apiClient.put(`/business-profile/business-profile/content-calendar/entries/${entryId}`, updateData);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating content calendar entry:', error);
+      throw error;
+    }
+  },
+
+  // Delete a content calendar entry
+  deleteContentCalendarEntry: async (entryId) => {
+    try {
+      await apiClient.delete(`/business-profile/business-profile/content-calendar/entries/${entryId}`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting content calendar entry:', error);
+      throw error;
+    }
+  },
+
+  // Clear all content calendar entries
+  clearAllContentCalendarEntries: async () => {
+    try {
+      await apiClient.delete('/business-profile/business-profile/content-calendar/clear-all');
+      return true;
+    } catch (error) {
+      console.error('Error clearing all content calendar entries:', error);
+      throw error;
+    }
   }
 };
 

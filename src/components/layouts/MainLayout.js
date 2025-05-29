@@ -46,7 +46,8 @@ import {
   History as HistoryIcon,
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -165,6 +166,8 @@ const MainLayout = () => {
     { text: 'Real-time Chat', icon: <ChatBubbleOutlineIcon />, path: '/ws-chat' },
     { text: 'Response Review', icon: <BookmarksIcon />, path: '/feedback-review' },
     { text: 'Website Analysis', icon: <SpeedIcon />, path: '/pagespeed' },
+    { text: 'SEO Analysis', icon: <SearchIcon />, path: '/seo-analysis' },
+    { text: 'Comprehensive Analysis', icon: <AnalyticsIcon />, path: '/comprehensive-analysis' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
     { text: 'Business Profile', icon: <BusinessIcon />, path: '/business-profile' },
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },

@@ -20,6 +20,7 @@ import businessProfileService from '../../services/businessProfileService';
 import BusinessProfileForm from './BusinessProfileForm';
 import BlogSuggestions from './BlogSuggestions';
 import ContentCalendarSetup from './ContentCalendarSetup';
+import SmartImageGenerator from './SmartImageGenerator';
 
 const BusinessProfilePage = () => {
   const [profile, setProfile] = useState(null);
@@ -183,6 +184,17 @@ const BusinessProfilePage = () => {
       {/* Only show these components if the profile exists */}
       {profile && (
         <>
+          {/* Smart Image Generation Section */}
+          <Box sx={{ mt: 4, mb: 4 }}>
+            <Typography variant="h5" gutterBottom>
+              Smart Image Generation
+            </Typography>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Generate images that perfectly match your business profile and branding.
+            </Typography>
+            <SmartImageGenerator businessProfileId={profile.id} />
+          </Box>
+
           {/* AI Blog Suggestions Component */}
           <BlogSuggestions />
           

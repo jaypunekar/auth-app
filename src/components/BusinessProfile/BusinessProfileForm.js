@@ -24,6 +24,10 @@ const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
     services: '',
     website_url: '',
     report_frequency_hours: 24, // Default to daily (24 hours)
+    description: '',
+    target_audience: '',
+    brand_colors: '',
+    brand_voice: ''
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -41,6 +45,10 @@ const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
         services: existingProfile.services || '',
         website_url: existingProfile.website_url || '',
         report_frequency_hours: existingProfile.report_frequency_hours || 24,
+        description: existingProfile.description || '',
+        target_audience: existingProfile.target_audience || '',
+        brand_colors: existingProfile.brand_colors || '',
+        brand_voice: existingProfile.brand_voice || ''
       });
     }
   }, [existingProfile]);
@@ -265,6 +273,48 @@ const BusinessProfileForm = ({ existingProfile, onProfileUpdated }) => {
               placeholder="Enter the services your business offers"
               multiline
               rows={3}
+              fullWidth
+            />
+
+            <TextField
+              label="Description (Optional)"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              placeholder="Enter a description of your business"
+              multiline
+              rows={3}
+              fullWidth
+            />
+
+            <TextField
+              label="Target Audience (Optional)"
+              name="target_audience"
+              value={formData.target_audience}
+              onChange={handleChange}
+              placeholder="Describe your target audience"
+              multiline
+              rows={2}
+              fullWidth
+            />
+
+            <TextField
+              label="Brand Colors (Optional)"
+              name="brand_colors"
+              value={formData.brand_colors}
+              onChange={handleChange}
+              placeholder="Enter your brand colors (e.g., #FF0000, #00FF00)"
+              fullWidth
+            />
+
+            <TextField
+              label="Brand Voice (Optional)"
+              name="brand_voice"
+              value={formData.brand_voice}
+              onChange={handleChange}
+              placeholder="Describe your brand's voice and tone"
+              multiline
+              rows={2}
               fullWidth
             />
 

@@ -475,6 +475,51 @@ const Subscriptions = () => {
       setError(err.response?.data?.detail || 'Failed to access billing portal');
       console.error('Error accessing billing portal:', err);
       setIsProcessing(false);
+      
+      // If error is about portal configuration, show a more specific message
+      if (err.response?.data?.detail?.includes('No configuration provided')) {
+        setError('Billing portal is not configured. Using alternative cancellation method...');
+        // If this was triggered by cancel button, try direct cancellation
+        if (err.config?.cancelAttempt) {
+          handleDirectCancellation();
+        }
+      }
+    }
+  };
+
+  const handleDirectCancellation = async () => {
+    setIsProcessing(true);
+    try {
+      const response = await axios.post('/api/subscription/cancel');
+      setSuccess(`Subscription successfully canceled. You will have access until ${format(new Date(response.data.access_until), 'MMMM dd, yyyy')}`);
+      // Refresh subscription status
+      await checkSubscription();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to cancel subscription');
+      console.error('Error canceling subscription:', err);
+    } finally {
+      setIsProcessing(false);
+      handleCloseContactSupportDialog();
+    }
+  };
+
+  const handleCancellation = async () => {
+    try {
+      // First try the billing portal
+      const response = await axios.post('/api/subscription/billing-portal', {}, {
+        cancelAttempt: true // Mark this request as a cancellation attempt
+      });
+      
+      // If successful, redirect to portal
+      window.location.href = response.data.portal_url;
+    } catch (err) {
+      // If portal fails, try direct cancellation
+      if (err.response?.data?.detail?.includes('No configuration provided')) {
+        await handleDirectCancellation();
+      } else {
+        setError(err.response?.data?.detail || 'Failed to process cancellation');
+        setIsProcessing(false);
+      }
     }
   };
 
@@ -586,14 +631,17 @@ const Subscriptions = () => {
           </Typography>
           
           {subscription.tier === 'Pro' && (
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<CreditCardIcon />}
-              onClick={handleManageBilling}
-            >
-              Manage Billing
-            </Button>
+            <Box>
+              <Button
+                variant="outlined"
+                size="small"
+                color="error"
+                startIcon={<CloseIcon />}
+                onClick={() => setOpenContactSupportDialog(true)}
+              >
+                Cancel Subscription
+              </Button>
+            </Box>
           )}
         </Box>
 
@@ -606,7 +654,7 @@ const Subscriptions = () => {
                 <Button 
                   color="inherit" 
                   size="small"
-                  onClick={handleManageBilling}
+                  onClick={() => setOpenContactSupportDialog(true)}
                 >
                   {paymentStatusInfo.action}
                 </Button>
@@ -841,31 +889,51 @@ const Subscriptions = () => {
         <DialogTitle>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <ContactSupportIcon sx={{ mr: 1 }} color="primary" />
-            Contact Support to Downgrade
+            Cancel Your Subscription
           </Box>
         </DialogTitle>
         <DialogContent>
           <DialogContentText>
-            To downgrade from the Pro to Free tier, please contact our support team. 
-            This ensures we can properly handle your data and account settings during the transition.
+            You can cancel your subscription through our billing portal. Your Pro access will continue until the end of your current billing period.
           </DialogContentText>
           <Box sx={{ mt: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
-            <Typography variant="body1">
-              <strong>Email:</strong> support@adtask.ai
+            <Typography variant="body1" gutterBottom>
+              What happens when you cancel:
             </Typography>
-            <Typography variant="body1">
-              <strong>Phone:</strong> +1 (555) 987-6543
-            </Typography>
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckIcon color="success" />
+                </ListItemIcon>
+                <ListItemText primary="Keep Pro access until billing period ends" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckIcon color="success" />
+                </ListItemIcon>
+                <ListItemText primary="No additional charges" />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckIcon color="success" />
+                </ListItemIcon>
+                <ListItemText primary="Can resubscribe anytime" />
+              </ListItem>
+            </List>
           </Box>
           <Alert severity="info" sx={{ mt: 2 }}>
-            You can also cancel your subscription through the "Manage Billing" button on this page, 
-            but you'll continue to have Pro access until the end of your current billing period.
+            Need help? Contact our support team at support@adtask.ai
           </Alert>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseContactSupportDialog}>Close</Button>
-          <Button onClick={handleManageBilling} color="primary" variant="contained" startIcon={<CreditCardIcon />}>
-            Manage Billing
+          <Button 
+            onClick={handleCancellation}
+            color="error" 
+            variant="contained" 
+            startIcon={<CloseIcon />}
+          >
+            Cancel Subscription
           </Button>
         </DialogActions>
       </Dialog>

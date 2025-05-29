@@ -6,6 +6,8 @@ import { useAuth } from './context/AuthContext';
 import { lazy, Suspense } from 'react';
 import { BusinessProfilePage } from './components/BusinessProfile';
 import FeedbackReview from './components/Chat/FeedbackReview';
+import SEOAnalysisPage from './pages/SEOAnalysisPage';
+import ComprehensiveAnalysis from './components/SEOAnalysis/ComprehensiveAnalysis';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -89,6 +91,8 @@ function App() {
           <Route path="business-profile" element={<BusinessProfilePage />} />
           <Route path="google-ads-analytics" element={<GoogleAdsAnalytics />} />
           <Route path="content-calendar" element={<ContentCalendarPage />} />
+          <Route path="seo-analysis" element={<SEOAnalysisPage />} />
+          <Route path="comprehensive-analysis" element={<ComprehensiveAnalysis />} />
         </Route>
 
         {/* Redirect to login for any other route */}
