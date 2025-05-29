@@ -58,10 +58,25 @@ const ComprehensiveAnalysis = () => {
     setSavedError(null);
     try {
       const response = await axios.get('/api/seo/saved-analyses');
-      setSavedAnalyses(response.data);
+      // Add debugging
+      console.log('Saved analyses response:', response);
+      
+      // Ensure we have an array
+      if (Array.isArray(response.data)) {
+        setSavedAnalyses(response.data);
+      } else {
+        console.error('Expected array but got:', response.data);
+        setSavedAnalyses([]);
+        setSavedError('Failed to load saved analyses: Invalid response format');
+      }
     } catch (err) {
       console.error('Error fetching saved analyses:', err);
-      setSavedError('Failed to load saved analyses. Please try refreshing the page.');
+      setSavedAnalyses([]); // Ensure savedAnalyses is always an array
+      setSavedError(
+        err.response?.data?.detail || 
+        err.response?.data?.message || 
+        'Failed to load saved analyses. Please try refreshing the page.'
+      );
     } finally {
       setLoadingSaved(false);
     }

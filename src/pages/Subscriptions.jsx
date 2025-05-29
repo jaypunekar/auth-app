@@ -632,15 +632,15 @@ const Subscriptions = () => {
           
           {subscription.tier === 'Pro' && (
             <Box>
-              <Button
-                variant="outlined"
-                size="small"
+            <Button
+              variant="outlined"
+              size="small"
                 color="error"
                 startIcon={<CloseIcon />}
                 onClick={() => setOpenContactSupportDialog(true)}
-              >
+            >
                 Cancel Subscription
-              </Button>
+            </Button>
             </Box>
           )}
         </Box>
