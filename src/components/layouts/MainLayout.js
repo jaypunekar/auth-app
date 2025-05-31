@@ -169,6 +169,7 @@ const MainLayout = () => {
     { text: 'SEO Analysis', icon: <SearchIcon />, path: '/seo-analysis' },
     { text: 'Comprehensive Analysis', icon: <AnalyticsIcon />, path: '/comprehensive-analysis' },
     { text: 'Ad Calendar', icon: <CalendarIcon />, path: '/adcalendar' },
+    { text: 'Content Calendar View', icon: <CalendarIcon />, path: '/content-calendar-view' },
     { text: 'Business Profile', icon: <BusinessIcon />, path: '/business-profile' },
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
     { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },

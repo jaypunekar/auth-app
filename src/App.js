@@ -33,6 +33,7 @@ import GoogleAdsFundsSuccess from './pages/GoogleAdsFundsSuccess';
 import DatabaseViewer from './pages/DatabaseViewer';
 import GoogleAdsAnalytics from './pages/GoogleAdsAnalytics';
 import ContentCalendarPage from './pages/ContentCalendarPage';
+import ContentCalendarView from './components/ContentCalendarView';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -91,6 +92,7 @@ function App() {
           <Route path="business-profile" element={<BusinessProfilePage />} />
           <Route path="google-ads-analytics" element={<GoogleAdsAnalytics />} />
           <Route path="content-calendar" element={<ContentCalendarPage />} />
+          <Route path="content-calendar-view" element={<ContentCalendarView />} />
           <Route path="seo-analysis" element={<SEOAnalysisPage />} />
           <Route path="comprehensive-analysis" element={<ComprehensiveAnalysis />} />
         </Route>

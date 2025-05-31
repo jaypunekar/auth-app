@@ -248,8 +248,19 @@ export const authAPI = {
 export const chatAPI = {
   startChat: () => api.post('/chat/start'),
   sendMessage: (sessionId, content) => api.post(`/chat/send/${sessionId}`, { content }),
+  getRunStatus: (threadId, runId) => api.get(`/chat/run_status/${threadId}/${runId}`),
   getChatHistory: (sessionId) => api.get(`/chat/history/${sessionId}`),
   getChatSessions: () => api.get('/chat/sessions'),
+  getCampaigns: () => api.get('/ads/campaigns'),
+  createCampaign: (campaignData) => api.post('/ads/campaigns', campaignData),
+  updateCampaign: (campaignId, campaignData) => api.put(`/ads/campaigns/${campaignId}`, campaignData),
+  deleteCampaign: (campaignId) => api.delete(`/ads/campaigns/${campaignId}`),
+  getCalendarEntries: (campaignId) => api.get(`/ads/campaigns/${campaignId}/calendar`),
+  createCalendarEntry: (campaignId, entryData) => api.post(`/ads/campaigns/${campaignId}/calendar`, entryData),
+  updateCalendarEntry: (entryId, entryData) => api.put(`/ads/calendar/${entryId}`, entryData),
+  deleteCalendarEntry: (entryId) => api.delete(`/ads/calendar/${entryId}`),
+  generateCalendar: (campaignId, generationData) => api.post(`/ads/campaigns/${campaignId}/generate-calendar`, generationData),
+  getContentCalendar: () => api.get('/content-calendar/'),
 };
 
 // Feedback API
