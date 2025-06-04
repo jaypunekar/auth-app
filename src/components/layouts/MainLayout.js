@@ -211,6 +211,20 @@ const MainLayout = () => {
         {/* Always show the Link button since free users can now link external accounts */}
         <GoogleAdsLinkButton />
         
+        {/* Add a Check Status button if an account is pending */}
+        {accountStatus.customerId && !accountStatus.isLinked && (
+          <Button
+            variant="outlined"
+            color="success"
+            startIcon={<RefreshIcon />}
+            onClick={() => fetchAccountStatus()}
+            fullWidth
+            sx={{ mb: 1 }}
+          >
+            Check Link Status
+          </Button>
+        )}
+        
         {/* Only show creation button for Pro users who can create accounts under our manager */}
         {subscription?.features?.can_create_google_ads_account ? (
           <GoogleAdsCreationButton />
@@ -355,7 +369,20 @@ const MainLayout = () => {
           
           {/* Only show Google Ads button if user has appropriate tier */}
           {canUseGoogleAds ? (
-            <GoogleAdsLinkButton />
+            <>
+              <GoogleAdsLinkButton />
+              {accountStatus.customerId && !accountStatus.isLinked && (
+                <Button
+                  variant="outlined"
+                  color="success"
+                  onClick={() => fetchAccountStatus()}
+                  startIcon={<RefreshIcon />}
+                  sx={{ ml: 1, bgcolor: 'rgba(255,255,255,0.15)' }}
+                >
+                  Check Status
+                </Button>
+              )}
+            </>
           ) : (
             <Tooltip title="Upgrade to Pro to connect Google Ads">
               <Button

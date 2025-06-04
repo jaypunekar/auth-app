@@ -18,6 +18,12 @@ import {
   Tab,
   Tooltip,
   IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -28,9 +34,11 @@ import {
   Timeline as TimelineIcon,
   PieChart as PieChartIcon,
   Refresh as RefreshIcon,
+  Analytics as AnalyticsIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { format, differenceInDays } from 'date-fns';
-import { adCampaignAPI } from '../services/api';
+import { adCampaignAPI, googleAdsAPI } from '../services/api';
 // Import recharts components for analytics graphs
 import { 
   BarChart, Bar, 
@@ -69,13 +77,223 @@ const conversionData = [
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
+// Analytics Modal Component
+const AnalyticsModal = ({ open, onClose, campaignId, googleAdsCampaignId }) => {
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('md'));
+  const [analyticsTab, setAnalyticsTab] = useState(0);
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Load analytics data when modal opens
+  useEffect(() => {
+    if (open && googleAdsCampaignId) {
+      fetchAnalytics();
+    }
+  }, [open, googleAdsCampaignId]);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching analytics for Google Ads campaign ID:', googleAdsCampaignId);
+      
+      const response = await googleAdsAPI.getCampaignPerformance(googleAdsCampaignId);
+      console.log('Analytics response:', response.data);
+      
+      // Check if data exists and is properly structured
+      if (response.data && response.data.success && response.data.data && response.data.data.performance_data) {
+        setAnalytics(response.data.data.performance_data);
+      } else {
+        console.warn('Analytics data not properly structured:', response.data);
+        setError('Analytics data format is invalid');
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+      setError('Failed to load campaign analytics. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setAnalyticsTab(newValue);
+  };
+
+  // Prepare data for charts from analytics data
+  const getImpressionData = () => {
+    if (!analytics || !analytics.time_series || analytics.time_series.length === 0) {
+      return impressionsData; // Fall back to sample data
+    }
+    
+    // Map time series data to day names
+    return analytics.time_series.map(day => ({
+      name: day.date ? format(new Date(day.date), 'EEE') : 'Unknown',
+      value: day.impressions || 0
+    }));
+  };
+  
+  const getClicksData = () => {
+    if (!analytics || !analytics.time_series || analytics.time_series.length === 0) {
+      return clicksData; // Fall back to sample data
+    }
+    
+    // Map time series data to day names
+    return analytics.time_series.map(day => ({
+      name: day.date ? format(new Date(day.date), 'EEE') : 'Unknown',
+      value: day.clicks || 0
+    }));
+  };
+  
+  const getConversionData = () => {
+    if (!analytics || !analytics.summary) {
+      return conversionData; // Fall back to sample data
+    }
+    
+    // Use summary data for the pie chart
+    return [
+      { name: 'Impressions', value: analytics.summary.total_impressions || 0 },
+      { name: 'Clicks', value: analytics.summary.total_clicks || 0 },
+      { name: 'Conversions', value: analytics.summary.total_conversions || 0 }
+    ];
+  };
+
+  return (
+    <Dialog
+      fullScreen={fullScreen}
+      maxWidth="lg"
+      open={open}
+      onClose={onClose}
+      aria-labelledby="analytics-dialog-title"
+    >
+      <DialogTitle id="analytics-dialog-title">
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Campaign Analytics</Typography>
+          <IconButton edge="end" color="inherit" onClick={onClose} aria-label="close">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      <DialogContent dividers>
+        {loading ? (
+          <Box display="flex" justifyContent="center" alignItems="center" height={400}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : (
+          <>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+              <Tabs value={analyticsTab} onChange={handleTabChange} aria-label="analytics tabs">
+                <Tab icon={<BarChartIcon />} label="Impressions" />
+                <Tab icon={<TimelineIcon />} label="Clicks" />
+                <Tab icon={<PieChartIcon />} label="Conversions" />
+              </Tabs>
+            </Box>
+            
+            {analyticsTab === 0 && (
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={getImpressionData()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Bar dataKey="value" name="Impressions" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+            
+            {analyticsTab === 1 && (
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={getClicksData()}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <RechartsTooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="value" name="Clicks" stroke="#82ca9d" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+            
+            {analyticsTab === 2 && (
+              <Box sx={{ height: 400 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={getConversionData()}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({name, value}) => `${name}: ${value}`}
+                    >
+                      {getConversionData().map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend />
+                    <RechartsTooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Box>
+            )}
+
+            {analytics && analytics.summary && (
+              <Box sx={{ mt: 3, p: 2, border: `1px solid ${theme.palette.divider}`, borderRadius: 1 }}>
+                <Typography variant="h6" gutterBottom>Performance Summary</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">Total Impressions</Typography>
+                    <Typography variant="h5">{analytics.summary.total_impressions?.toLocaleString() || 0}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">Total Clicks</Typography>
+                    <Typography variant="h5">{analytics.summary.total_clicks?.toLocaleString() || 0}</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="subtitle2" color="text.secondary">Total Cost</Typography>
+                    <Typography variant="h5">${analytics.summary.total_cost?.toFixed(2) || '0.00'}</Typography>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Close</Button>
+        <Button 
+          color="primary" 
+          startIcon={<RefreshIcon />} 
+          onClick={fetchAnalytics}
+          disabled={loading}
+        >
+          Refresh Data
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const AdCampaignDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [analyticsTab, setAnalyticsTab] = useState(0);
+  const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -171,9 +389,13 @@ const AdCampaignDetail = () => {
   const handleEdit = () => {
     navigate(`/campaigns/edit/${id}`);
   };
-
-  const handleAnalyticsTabChange = (event, newValue) => {
-    setAnalyticsTab(newValue);
+  
+  const handleOpenAnalytics = () => {
+    setAnalyticsModalOpen(true);
+  };
+  
+  const handleCloseAnalytics = () => {
+    setAnalyticsModalOpen(false);
   };
 
   const getStatusColor = (status) => {
@@ -334,96 +556,29 @@ const AdCampaignDetail = () => {
                   </IconButton>
                 </Tooltip>
               </Typography>
-              <IconButton>
-                <RefreshIcon />
-              </IconButton>
             </Box>
             
-            {!isAnalyticsAvailable() ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  Analytics will be available when your ads have been live for at least one week.
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <Typography variant="body1" paragraph>
+                View comprehensive analytics data for this campaign including impressions, clicks, conversions, and more.
+              </Typography>
+              
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AnalyticsIcon />}
+                onClick={handleOpenAnalytics}
+                disabled={!campaign.google_ads_campaign_id}
+              >
+                Open Analytics Dashboard
+              </Button>
+              
+              {!campaign.google_ads_campaign_id && (
+                <Alert severity="info" sx={{ mt: 2 }}>
+                  This campaign is not linked to Google Ads. Analytics are only available for Google Ads campaigns.
                 </Alert>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  This ensures we can collect enough data to provide meaningful insights.
-                </Typography>
-                <LinearProgress sx={{ height: 10, borderRadius: 5 }} />
-              </Box>
-            ) : (
-              <>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-                  <Tabs value={analyticsTab} onChange={handleAnalyticsTabChange} aria-label="analytics tabs">
-                    <Tab icon={<BarChartIcon />} label="Impressions" />
-                    <Tab icon={<TimelineIcon />} label="Clicks" />
-                    <Tab icon={<PieChartIcon />} label="Conversions" />
-                  </Tabs>
-                </Box>
-                
-                {analyticsTab === 0 && (
-                  <Box sx={{ height: 300 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={impressionsData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <RechartsTooltip />
-                        <Legend />
-                        <Bar dataKey="value" name="Impressions" fill="#8884d8" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Box>
-                )}
-                
-                {analyticsTab === 1 && (
-                  <Box sx={{ height: 300 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={clicksData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <RechartsTooltip />
-                        <Legend />
-                        <Line type="monotone" dataKey="value" name="Clicks" stroke="#82ca9d" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </Box>
-                )}
-                
-                {analyticsTab === 2 && (
-                  <Box sx={{ height: 300 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={conversionData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({name}) => name}
-                        >
-                          {conversionData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Legend />
-                        <RechartsTooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </Box>
-                )}
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Last updated: {format(new Date(), 'PPP p')}
-                  </Typography>
-                  <Button variant="text" size="small">
-                    Export Data
-                  </Button>
-                </Box>
-              </>
-            )}
+              )}
+            </Box>
           </Paper>
           
           <Paper sx={{ p: 3 }}>
@@ -538,61 +693,40 @@ const AdCampaignDetail = () => {
               Performance Summary
             </Typography>
             
-            {!isAnalyticsAvailable() ? (
+            {!campaign.google_ads_campaign_id ? (
               <Alert severity="info" sx={{ mb: 2 }}>
-                Performance data will be available after one week.
+                Performance data is only available for Google Ads campaigns.
               </Alert>
             ) : (
               <>
                 <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Impressions
-                    </Typography>
-                    <Typography variant="subtitle2">
-                      0
-                    </Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={0} sx={{ mt: 1, height: 6, borderRadius: 3 }} />
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    fullWidth
+                    startIcon={<AnalyticsIcon />}
+                    onClick={handleOpenAnalytics}
+                  >
+                    View Analytics
+                  </Button>
                 </Box>
                 
-                <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Click-through Rate
-                    </Typography>
-                    <Typography variant="subtitle2">
-                      0%
-                    </Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={0} sx={{ mt: 1, height: 6, borderRadius: 3 }} color="success" />
-                </Box>
-                
-                <Box sx={{ mb: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                      Conversion Rate
-                    </Typography>
-                    <Typography variant="subtitle2">
-                      0%
-                    </Typography>
-                  </Box>
-                  <LinearProgress variant="determinate" value={0} sx={{ mt: 1, height: 6, borderRadius: 3 }} color="secondary" />
-                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
+                  Click the button above to view detailed performance analytics for this campaign.
+                </Typography>
               </>
             )}
-            
-            <Button
-              variant="contained"
-              fullWidth
-              sx={{ mt: 2 }}
-              disabled={!isAnalyticsAvailable()}
-            >
-              View Detailed Report
-            </Button>
           </Paper>
         </Grid>
       </Grid>
+      
+      {/* Analytics Modal */}
+      <AnalyticsModal 
+        open={analyticsModalOpen}
+        onClose={handleCloseAnalytics}
+        campaignId={id}
+        googleAdsCampaignId={campaign?.google_ads_campaign_id}
+      />
     </Box>
   );
 };

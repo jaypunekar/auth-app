@@ -21,21 +21,18 @@ import {
   Paper,
   Snackbar,
   Chip,
-  Grid,
-  Divider,
-  IconButton,
-  InputAdornment,
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  InputAdornment
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import AddCircleIcon from '@mui/icons-material/AddCircle';
 import MoneyIcon from '@mui/icons-material/Money';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import HistoryIcon from '@mui/icons-material/History';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import googleAdsApi from '../services/googleAdsApi';
 
 const GoogleAdsLinkButton = () => {
@@ -85,6 +82,58 @@ const GoogleAdsLinkButton = () => {
 
   const steps = ['Select Account Type', 'Enter Account ID', 'Link Status'];
 
+  // Define the checkAccountStatus function at component level so it can be used in multiple places
+  const checkAccountStatus = async () => {
+    try {
+      const response = await googleAdsApi.getAccountStatus();
+      if (response && response.data) {
+        const newStatus = {
+          isLinked: response.data.is_linked || false,
+          customerId: response.data.customer_id || '',
+          connectionType: response.data.connection_type || '',
+          availableFunds: response.data.available_funds || 0,
+          hasPreviousAccounts: response.data.has_previous_accounts || false,
+          previousAccounts: response.data.previous_accounts || []
+        };
+        
+        // If status changed from linked to unlinked, reset the component and notify
+        if (accountStatus.isLinked && !newStatus.isLinked) {
+          console.log("Account link status changed from active to inactive, resetting");
+          setCustomerId('');
+          setActiveStep(0);
+          setLinkStatus(null);
+          setError('');
+          setSuccess('');
+          
+          // Clear localStorage
+          localStorage.removeItem('googleAds_customerId');
+          localStorage.removeItem('googleAds_activeStep');
+          
+          // Show notification about account status change
+          setNotification({
+            open: true,
+            message: 'Your Google Ads account link has been deactivated. Please reconnect your account.'
+          });
+        }
+        
+        // If the account is linked, we should reset the activeStep to avoid showing the link status page
+        if (newStatus.isLinked) {
+          setActiveStep(0);
+          localStorage.removeItem('googleAds_activeStep');
+        }
+        
+        setAccountStatus(newStatus);
+        
+        // Update the previously linked accounts if available from the response
+        if (newStatus.hasPreviousAccounts && newStatus.previousAccounts.length > 0) {
+          setPreviouslyLinkedAccounts(newStatus.previousAccounts);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking Google Ads account status:', error);
+    }
+  };
+
   // Automatically open dialog if there's a pending invitation
   useEffect(() => {
     const savedStep = parseInt(localStorage.getItem('googleAds_activeStep'));
@@ -96,59 +145,25 @@ const GoogleAdsLinkButton = () => {
     }
   }, [accountStatus.isLinked]);
 
+  // Prevent automatic checking on component mount
+  useEffect(() => {
+    // Only check account status when the component mounts
+    checkAccountStatus();
+    
+    // Do NOT automatically check link status anymore - user will do it manually
+    
+    // Save customerId to localStorage
+    if (customerId) {
+      localStorage.setItem('googleAds_customerId', customerId);
+    }
+    
+    if (activeStep !== undefined) {
+      localStorage.setItem('googleAds_activeStep', activeStep.toString());
+    }
+  }, [customerId, activeStep]);
+
   // Check if the user already has a linked account and refresh status periodically
   useEffect(() => {
-    const checkAccountStatus = async () => {
-      try {
-        const response = await googleAdsApi.getAccountStatus();
-        if (response && response.data) {
-          const newStatus = {
-            isLinked: response.data.is_linked || false,
-            customerId: response.data.customer_id || '',
-            connectionType: response.data.connection_type || '',
-            availableFunds: response.data.available_funds || 0,
-            hasPreviousAccounts: response.data.has_previous_accounts || false,
-            previousAccounts: response.data.previous_accounts || []
-          };
-          
-          // If status changed from linked to unlinked, reset the component and notify
-          if (accountStatus.isLinked && !newStatus.isLinked) {
-            console.log("Account link status changed from active to inactive, resetting");
-            setCustomerId('');
-            setActiveStep(0);
-            setLinkStatus(null);
-            setError('');
-            setSuccess('');
-            
-            // Clear localStorage
-            localStorage.removeItem('googleAds_customerId');
-            localStorage.removeItem('googleAds_activeStep');
-            
-            // Show notification about account status change
-            setNotification({
-              open: true,
-              message: 'Your Google Ads account link has been deactivated. Please reconnect your account.'
-            });
-          }
-          
-          // If the account is linked, we should reset the activeStep to avoid showing the link status page
-          if (newStatus.isLinked) {
-            setActiveStep(0);
-            localStorage.removeItem('googleAds_activeStep');
-          }
-          
-          setAccountStatus(newStatus);
-          
-          // Update the previously linked accounts if available from the response
-          if (newStatus.hasPreviousAccounts && newStatus.previousAccounts.length > 0) {
-            setPreviouslyLinkedAccounts(newStatus.previousAccounts);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking Google Ads account status:', error);
-      }
-    };
-
     // Check immediately on mount
     checkAccountStatus();
     
@@ -258,65 +273,8 @@ const GoogleAdsLinkButton = () => {
   // Check link status if customerId is available and we're on the status step
   useEffect(() => {
     if (activeStep === 2 && customerId && !accountStatus.isLinked) {
-      const checkLinkStatus = async () => {
-        try {
-          setLoading(true);
-          const response = await googleAdsApi.checkLinkStatus(customerId);
-          setLinkStatus(response.data);
-          
-          // If the account is active, update accountStatus and show success message
-          if (response.data && (response.data.is_active || response.data.status === "ACTIVE")) {
-            console.log("Account link is active, updating status");
-            setAccountStatus({
-              isLinked: true,
-              customerId: customerId
-            });
-            setSuccess('Google Ads account successfully linked!');
-            
-            // Clear localStorage since we're now linked
-            localStorage.removeItem('googleAds_customerId');
-            localStorage.removeItem('googleAds_activeStep');
-            
-            // Re-fetch the account status to ensure the database is updated
-            const statusResponse = await googleAdsApi.getAccountStatus();
-            if (statusResponse && statusResponse.data) {
-              setAccountStatus({
-                isLinked: statusResponse.data.is_linked || false,
-                customerId: statusResponse.data.customer_id || customerId
-              });
-            }
-          } else if (response.data && (response.data.status === "DECLINED" || response.data.status === "REFUSED")) {
-            // If the invitation was declined, show appropriate message
-            setError('The invitation has been declined. Please try again if you want to link this account.');
-            // Don't immediately reset - allow user to see the status and errors
-          } else if (response.data && response.data.status === "NOT_FOUND") {
-            // If the link is not found, show an error and reset
-            setError('Link request not found or expired. Please try again.');
-            setTimeout(() => {
-              setActiveStep(0);
-              setCustomerId('');
-              
-              // Clear localStorage
-              localStorage.removeItem('googleAds_customerId');
-              localStorage.removeItem('googleAds_activeStep');
-            }, 3000);
-          }
-          setLoading(false);
-        } catch (error) {
-          console.error('Error checking link status:', error);
-          // Fix: Ensure we're setting a string, not an object
-          const errorMessage = typeof error.response?.data?.detail === 'object' 
-            ? JSON.stringify(error.response?.data?.detail) 
-            : error.response?.data?.detail || 'Failed to check link status. Please try again.';
-          setError(errorMessage);
-          setLoading(false);
-        }
-      };
-      
-      const intervalId = setInterval(checkLinkStatus, 60000); // Check every minute
-      checkLinkStatus(); // Check immediately
-      
-      return () => clearInterval(intervalId);
+      // Don't automatically check status - let user do it manually with the button
+      console.log("On status check step - waiting for manual check");
     }
   }, [activeStep, customerId, accountStatus.isLinked]);
 
@@ -421,52 +379,6 @@ const GoogleAdsLinkButton = () => {
     }
   };
 
-  // Add a new function to force unlink a previous account
-  const handleForceUnlink = async (customerId) => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      // Call the API to force unlink the account
-      const response = await googleAdsApi.forceUnlinkAccount(customerId);
-      
-      if (response && response.success) {
-        setSuccess('Previous account successfully unlinked. You can now link your new account.');
-        // Refresh the account status
-        const statusResponse = await googleAdsApi.getAccountStatus();
-        if (statusResponse && statusResponse.data) {
-          setAccountStatus({
-            isLinked: statusResponse.data.is_linked || false,
-            customerId: statusResponse.data.customer_id || '',
-            connectionType: statusResponse.data.connection_type || '',
-            availableFunds: statusResponse.data.available_funds || 0,
-            hasPreviousAccounts: statusResponse.data.has_previous_accounts || false,
-            previousAccounts: statusResponse.data.previous_accounts || []
-          });
-        }
-        
-        // If we forced an unlink from the existing account flow, stay on the same step
-        if (activeStep === 1) {
-          // Do nothing, keep the user on step 1
-        } else {
-          // Otherwise, reset to step 0
-          setActiveStep(0);
-        }
-      } else {
-        setError(response?.message || 'Failed to unlink previous account. Please try again or contact support.');
-      }
-    } catch (error) {
-      console.error('Error force unlinking account:', error);
-      // Fix: Ensure we're setting a string, not an object
-      const errorMessage = typeof error.response?.data?.detail === 'object' 
-        ? JSON.stringify(error.response?.data?.detail) 
-        : error.response?.data?.detail || 'Failed to unlink previous account. Please try again or contact support.';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleNext = () => {
     if (activeStep === 0) {
       // Before moving to step 1, validate the selection
@@ -506,11 +418,14 @@ const GoogleAdsLinkButton = () => {
       setError('');
       
       const response = await googleAdsApi.checkLinkStatus(customerId);
+      console.log('Manual status check response:', response);
       setLinkStatus(response.data);
       
       // If the account is now active, update accountStatus
       if (response.data && (response.data.is_active || response.data.status === "ACTIVE")) {
         setSuccess('Google Ads account successfully linked!');
+        
+        // Update both local state and parent component state
         setAccountStatus({
           isLinked: true,
           customerId: customerId
@@ -523,16 +438,34 @@ const GoogleAdsLinkButton = () => {
         // Re-fetch the account status to ensure the database is updated
         const statusResponse = await googleAdsApi.getAccountStatus();
         if (statusResponse && statusResponse.data) {
-          setAccountStatus({
+          const newStatus = {
             isLinked: statusResponse.data.is_linked || false,
-            customerId: statusResponse.data.customer_id || customerId
+            customerId: statusResponse.data.customer_id || customerId,
+            connectionType: statusResponse.data.connection_type || '',
+            availableFunds: statusResponse.data.available_funds || 0
+          };
+          setAccountStatus(newStatus);
+          
+          // Show a notification of the successful link
+          setNotification({
+            open: true,
+            message: 'Your Google Ads account is now successfully linked!'
           });
+          
+          // Close the dialog after a delay on success
+          setTimeout(() => {
+            setOpen(false);
+          }, 2000);
         }
       } else if (response.data && (response.data.status === "DECLINED" || response.data.status === "REFUSED")) {
         // Handle declined invitation
         setError('The invitation has been declined. Please start over if you want to link this account.');
       } else if (response.data && response.data.status === "NOT_FOUND") {
         setError('Link request not found or expired. Please try again.');
+      } else if (response.data && response.data.status === "PENDING") {
+        // For pending status, just show the information without error
+        setSuccess(null); // Clear any previous success
+        setError(null); // Clear any previous error
       }
     } catch (error) {
       console.error('Error checking link status:', error);
@@ -732,59 +665,7 @@ const GoogleAdsLinkButton = () => {
           </Box>
         );
       case 2:
-        return (
-          <Box>
-            {loading ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-                <CircularProgress />
-                <Typography variant="body2" sx={{ mt: 2 }}>
-                  Checking link status...
-                </Typography>
-              </Box>
-            ) : (
-              <Box>
-                {error && (
-                  <Alert severity="error" sx={{ mb: 2 }}>
-                    {error}
-                  </Alert>
-                )}
-                {success && (
-                  <Alert severity="success" sx={{ mb: 2 }}>
-                    {success}
-                  </Alert>
-                )}
-                
-                {linkStatus && (
-                  <Box>
-                    <Typography variant="h6" gutterBottom>
-                  Link Status: {linkStatus.status}
-                </Typography>
-                    
-                    {linkStatus.status === "PENDING" && (
-                      <Box>
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                          The invitation has been sent to the Google Ads account. Please check your Google Ads account and accept the invitation.
-                        </Alert>
-                <Typography variant="body2" gutterBottom>
-                          Steps to accept the invitation:
-                </Typography>
-                        <ol>
-                          <li>Log in to your Google Ads account at <a href="https://ads.google.com" target="_blank" rel="noopener noreferrer">ads.google.com</a></li>
-                          <li>Click on the Tools &amp; Settings icon in the top right</li>
-                          <li>Go to Setup &gt; Access and security</li>
-                          <li>Look for pending invitations and accept the invitation from our account</li>
-                        </ol>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                          Once you accept the invitation, this page will update automatically.
-              </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-              </Box>
-            )}
-          </Box>
-        );
+        return statusStepContent;
       default:
         return 'Unknown step';
     }
@@ -1003,6 +884,91 @@ const GoogleAdsLinkButton = () => {
   const handleCloseNotification = () => {
     setNotification({ ...notification, open: false });
   };
+
+  // Replace automatic status check with a more prominent manual check UI
+  const statusStepContent = (
+    <Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {success}
+        </Alert>
+      )}
+      
+      <Typography variant="h6" gutterBottom>
+        Google Ads Link Status
+      </Typography>
+      
+      <Paper 
+        elevation={3} 
+        sx={{ 
+          p: 3, 
+          mb: 3, 
+          border: linkStatus && linkStatus.status === 'ACTIVE' ? '2px solid green' : '1px solid #ddd'
+        }}
+      >
+        <Typography variant="body1" gutterBottom>
+          Customer ID: <strong>{customerId}</strong>
+        </Typography>
+        
+        {linkStatus ? (
+          <>
+            <Typography variant="body1" gutterBottom>
+              Status: <Chip 
+                label={linkStatus.status || "UNKNOWN"} 
+                color={linkStatus.status === 'ACTIVE' ? 'success' : linkStatus.status === 'PENDING' ? 'warning' : 'error'} 
+                sx={{ ml: 1 }} 
+              />
+            </Typography>
+            
+            <Typography variant="body1" gutterBottom>
+              {linkStatus.message || "Please check the status of your link request."}
+            </Typography>
+            
+            {linkStatus.explanation && (
+              <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
+                {linkStatus.explanation}
+              </Alert>
+            )}
+            
+            {linkStatus.recommended_action && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                <strong>Recommended action:</strong> {linkStatus.recommended_action}
+              </Typography>
+            )}
+          </>
+        ) : (
+          <Typography variant="body1" color="text.secondary">
+            Click the button below to check the status of your link request.
+          </Typography>
+        )}
+        
+        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleCheckStatus}
+            disabled={loading}
+            startIcon={loading ? <CircularProgress size={20} /> : <RefreshIcon />}
+            size="large"
+            sx={{ px: 4, py: 1 }}
+          >
+            {loading ? 'Checking...' : 'Check Link Status'}
+          </Button>
+        </Box>
+      </Paper>
+      
+      <Typography variant="body2" color="text.secondary">
+        You'll need to accept the invitation in your Google Ads account before the link can be established.
+        We've sent an email with instructions to your registered email address.
+      </Typography>
+    </Box>
+  );
 
   return (
     <>
