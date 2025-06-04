@@ -34,6 +34,7 @@ import DatabaseViewer from './pages/DatabaseViewer';
 import GoogleAdsAnalytics from './pages/GoogleAdsAnalytics';
 import ContentCalendarPage from './pages/ContentCalendarPage';
 import ContentCalendarView from './components/ContentCalendarView';
+import CampaignSharePage from './pages/CampaignSharePage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -68,6 +69,9 @@ function App() {
         <Route path="verify-email" element={<VerifyEmail />} />
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="verify" element={<VerificationPage />} />
+        
+        {/* Public Campaign Share Page */}
+        <Route path="campaign/share/:shareId" element={<CampaignSharePage />} />
 
         {/* Protected Routes */}
         <Route path="/" element={
@@ -95,6 +99,7 @@ function App() {
           <Route path="content-calendar-view" element={<ContentCalendarView />} />
           <Route path="seo-analysis" element={<SEOAnalysisPage />} />
           <Route path="comprehensive-analysis" element={<ComprehensiveAnalysis />} />
+          <Route path="campaign-share" element={<CampaignSharePage />} />
         </Route>
 
         {/* Redirect to login for any other route */}

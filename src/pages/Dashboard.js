@@ -1308,24 +1308,25 @@ const Dashboard = () => {
       <TabPanel value={activeTab} index={1}>
         {!canUseGoogleAds ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Box sx={{ mb: 2 }}>
-              <LockIcon fontSize="large" color="action" />
-            </Box>
             <Typography variant="h6" gutterBottom>
-              Google Ads Integration is a Pro Feature
+              Link Your Google Ads Account
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Upgrade to Pro tier to connect your Google Ads account and manage campaigns directly.
+              You can now link your existing Google Ads account to manage campaigns directly in our platform.
             </Typography>
             <Button
               variant="contained"
-              color="secondary"
+              color="primary"
               component={RouterLink}
-              to="/subscriptions"
-              startIcon={<StarIcon />}
+              to="/"
+              startIcon={<GoogleIcon />}
+              sx={{ mr: 2 }}
             >
-              Upgrade to Pro
+              Link Account
             </Button>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 3 }}>
+              Want to create a new Google Ads account managed by us? <RouterLink to="/subscriptions">Upgrade to Pro</RouterLink>
+            </Typography>
           </Box>
         ) : (
           <>

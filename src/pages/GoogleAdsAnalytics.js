@@ -210,16 +210,16 @@ const GoogleAdsAnalytics = () => {
             Google Ads Analytics
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            <AlertTitle>Feature Not Available</AlertTitle>
-            Google Ads features are only available on Pro or Enterprise plans.
+            <AlertTitle>Link Your Google Ads Account</AlertTitle>
+            To use this feature, you need to link your existing Google Ads account first.
           </Alert>
           <Button 
             variant="contained" 
             color="primary" 
             sx={{ mt: 2 }}
-            onClick={() => navigate('/subscriptions')}
+            onClick={() => navigate('/')}
           >
-            Upgrade Plan
+            Go to Dashboard
           </Button>
         </Paper>
       </Box>

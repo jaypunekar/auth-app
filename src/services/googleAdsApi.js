@@ -53,9 +53,13 @@ const googleAdsApi = {
   },
 
   // Link an existing Google Ads account
-  linkExistingAccount: async (customerId) => {
+  linkExistingAccount: async (data) => {
     try {
+      // If data is an object with customer_id property, extract it
+      const customerId = typeof data === 'object' && data.customer_id ? data.customer_id : data;
+      
       console.log(`Linking existing Google Ads account: ${customerId}`);
+      // Ensure we're sending the customerId as a string parameter, not an object
       const response = await api.post('/google-ads/link-existing-account', { customer_id: customerId });
       console.log('Link existing account response:', response.data);
       return response.data;

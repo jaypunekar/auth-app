@@ -245,7 +245,11 @@ const GoogleAdsLinkButton = () => {
       }
     } catch (error) {
       console.error('Error relinking account:', error);
-      setError(error.response?.data?.detail || 'Failed to relink account. Please try again.');
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to relink account. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -300,7 +304,11 @@ const GoogleAdsLinkButton = () => {
           setLoading(false);
         } catch (error) {
           console.error('Error checking link status:', error);
-          setError(error.response?.data?.detail || 'Failed to check link status. Please try again.');
+          // Fix: Ensure we're setting a string, not an object
+          const errorMessage = typeof error.response?.data?.detail === 'object' 
+            ? JSON.stringify(error.response?.data?.detail) 
+            : error.response?.data?.detail || 'Failed to check link status. Please try again.';
+          setError(errorMessage);
           setLoading(false);
         }
       };
@@ -338,108 +346,76 @@ const GoogleAdsLinkButton = () => {
   };
 
   const handleLinkAccount = async () => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
     try {
+      setLoading(true);
+      setError('');
+      
+      // Format customer ID by removing dashes or other formatting if present
+      const formattedCustomerId = customerId.replace(/[^0-9]/g, '');
+      
+      // Determine which API to call based on account type
+      let apiMethod;
+      let requestData;
+      
       if (accountType === 'new') {
-        const requestData = { generate_new_account: true };
-        const response = await googleAdsApi.linkAccount(requestData);
+        apiMethod = 'linkAccount';
+        requestData = { generate_new_account: true };
+      } else {
+        apiMethod = 'linkExistingAccount';
+        // Make sure we're sending a string, not an object with a string in it
+        requestData = { customer_id: formattedCustomerId.toString() };
+      }
+      
+      const response = await googleAdsApi[apiMethod](requestData);
+      
+      if (response.success) {
+        // Display success message
+        setSuccess(response.message);
         
-        if (response && response.success) {
-          setSuccess(response.message);
+        // Store customer ID and step for checking status later
+        if (accountType === 'existing') {
+          localStorage.setItem('googleAds_customerId', formattedCustomerId);
+          localStorage.setItem('googleAds_activeStep', '2'); // Link status step
+        }
+        
+        // If account is already linked, update account status
+        if (response.data && (response.data.is_linked || response.data.link_status === 'ACTIVE')) {
           setAccountStatus({
             isLinked: true,
-            customerId: response.data.customer_id
+            customerId: formattedCustomerId,
+            connectionType: response.data.connection_type || ''
           });
           
-          // Clear localStorage since we're now linked
-          localStorage.removeItem('googleAds_customerId');
-          localStorage.removeItem('googleAds_activeStep');
-        } else {
-          setError('Failed to create Google Ads account. Please try again.');
-        }
-      } else {
-        // Existing account
-        const response = await googleAdsApi.linkExistingAccount(customerId);
-        
-        if (response && response.success) {
-          // If the account is already active, we're done
-          if (response.data.status === "ACTIVE") {
-            setSuccess('Google Ads account successfully linked!');
-            setAccountStatus({
-              isLinked: true,
-              customerId: response.data.customer_id
-            });
-            
-            // Clear localStorage since we're now linked
+          // Close dialog after a short delay
+          setTimeout(() => {
+            setOpen(false);
+            setSuccess('');
+            setError('');
+            setCustomerId('');
+            setActiveStep(0);
             localStorage.removeItem('googleAds_customerId');
             localStorage.removeItem('googleAds_activeStep');
+          }, 3000);
         } else {
-            // If pending, move to the next step and show instructions
-            setActiveStep(2);
-            // Save the current step to localStorage
-            localStorage.setItem('googleAds_activeStep', "2");
-            
-            // Set up to check status later
-            setLinkStatus(response.data);
-          }
+          // Move to next step to display link status
+          setLinkStatus(response.data);
+          handleNext();
+        }
+      } else {
+        // Check if this is an upgrade required message for creating new accounts
+        if (response.data && response.data.requires_upgrade) {
+          setError('Creating a new Google Ads account under our manager requires a Pro subscription. You can link your existing Google Ads account instead.');
         } else {
-          // Check for the specific "already has an active account" error
-          const errorMessage = response?.message || '';
-          if (errorMessage.includes('already has an active Google Ads account')) {
-            // Extract the customer ID from the error message using regex
-            const idMatch = errorMessage.match(/ID: (\d+)/);
-            const existingId = idMatch ? idMatch[1] : null;
-            
-            setError(
-              <>
-                {errorMessage}
-                <Box mt={2}>
-                  <Button 
-                    variant="outlined" 
-                    color="error" 
-                    size="small"
-                    onClick={() => handleForceUnlink(existingId)}
-                  >
-                    Force Unlink Previous Account
-                  </Button>
-                </Box>
-              </>
-            );
-          } else {
-            setError(errorMessage || 'Failed to link Google Ads account. Please try again.');
-          }
+          setError(response.message || 'Failed to link account');
         }
       }
     } catch (error) {
-      console.error('Error linking Google Ads account:', error);
-      // Check if the error is about already having an active account
-      const errorDetail = error.response?.data?.detail || '';
-      if (errorDetail.includes('already has an active Google Ads account')) {
-        // Extract the customer ID from the error message using regex
-        const idMatch = errorDetail.match(/ID: (\d+)/);
-        const existingId = idMatch ? idMatch[1] : null;
-        
-        setError(
-          <>
-            {errorDetail}
-            <Box mt={2}>
-              <Button 
-                variant="outlined" 
-                color="error" 
-                size="small"
-                onClick={() => handleForceUnlink(existingId)}
-              >
-                Force Unlink Previous Account
-              </Button>
-            </Box>
-          </>
-        );
-      } else {
-        setError(errorDetail || 'Failed to link Google Ads account. Please try again.');
-      }
+      console.error('Error linking account:', error);
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to link account. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -472,7 +448,7 @@ const GoogleAdsLinkButton = () => {
         // If we forced an unlink from the existing account flow, stay on the same step
         if (activeStep === 1) {
           // Do nothing, keep the user on step 1
-    } else {
+        } else {
           // Otherwise, reset to step 0
           setActiveStep(0);
         }
@@ -481,7 +457,11 @@ const GoogleAdsLinkButton = () => {
       }
     } catch (error) {
       console.error('Error force unlinking account:', error);
-      setError(error.response?.data?.detail || 'Failed to unlink previous account. Please try again or contact support.');
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to unlink previous account. Please try again or contact support.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -556,7 +536,11 @@ const GoogleAdsLinkButton = () => {
       }
     } catch (error) {
       console.error('Error checking link status:', error);
-      setError(error.response?.data?.detail || 'Failed to check link status. Please try again.');
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to check link status. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1006,7 +990,11 @@ const GoogleAdsLinkButton = () => {
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
-      setError(error.response?.data?.detail || 'Failed to create checkout session. Please try again.');
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to create checkout session. Please try again.';
+      setError(errorMessage);
     } finally {
       setFundsLoading(false);
     }

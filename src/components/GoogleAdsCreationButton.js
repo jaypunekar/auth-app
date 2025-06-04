@@ -60,7 +60,7 @@ const modalStyle = {
   overflow: 'auto'
 };
 
-const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: externalOnClose }) => {
+const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: externalOnClose, onCampaignCreate }) => {
   const [open, setOpen] = useState(externalOpen || false);
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -180,7 +180,7 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   const handleRelinkAccount = async (accountId) => {
     try {
       setLoading(true);
-      setError('');
+      setError(null);
       
       const response = await googleAdsApi.relinkAccount(accountId);
       
@@ -189,32 +189,30 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
         
         // Update account status
         setAccountStatus({
-          is_linked: true,
-          customer_id: response.data.customer_id,
-          connection_type: response.data.connection_type,
-          available_funds: response.data.available_funds || 0
+          isLinked: true,
+          customerId: response.data.customer_id,
+          connectionType: response.data.connection_type,
+          availableFunds: response.data.available_funds || 0
         });
         
-        // Remove the relinked account from unlinked accounts list
-        setUnlinkedAccounts(prevAccounts => 
-          prevAccounts.filter(acc => acc.id !== accountId)
-        );
-        
-        // Close the modal
+        // Close the dialog
         setModalOpen(false);
         
         // Show notification
         setNotification({
           open: true,
-          message: 'Your Google Ads account has been relinked successfully.',
-          severity: 'success'
+          message: 'Your Google Ads account has been relinked successfully.'
         });
       } else {
         setError(response.message || 'Failed to relink account');
       }
     } catch (error) {
       console.error('Error relinking account:', error);
-      setError(error.response?.data?.detail || 'Failed to relink account. Please try again.');
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to relink account. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -222,7 +220,47 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
 
   // Handle creating a new Google Ads account
   const handleCreateAccount = async () => {
-    // ... existing function ...
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await googleAdsApi.linkAccount({
+        generate_new_account: true
+      });
+      
+      if (response.success) {
+        setSuccess("Google Ads account created successfully!");
+        
+        // Update account status
+        setAccountStatus({
+          isLinked: true,
+          customerId: response.data.customer_id,
+          connectionType: response.data.connection_type,
+          availableFunds: response.data.available_funds || 0
+        });
+        
+        // Close the modal
+        setTimeout(() => {
+          setModalOpen(false);
+        }, 2000);
+      } else {
+        // Check if this is an upgrade required message
+        if (response.data && response.data.requires_upgrade) {
+          setError('Creating a new Google Ads account under our manager requires a Pro subscription. You can link your existing Google Ads account instead.');
+        } else {
+          setError(response.message || 'Failed to create Google Ads account');
+        }
+      }
+    } catch (error) {
+      console.error('Error creating Google Ads account:', error);
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to create Google Ads account. Please try again.';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpen = () => {
@@ -336,6 +374,30 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
     }
   };
 
+  // Add this function to reset the form
+  const resetForm = () => {
+    setFormData({
+      campaign_name: '',
+      daily_budget: '',
+      start_date: new Date(),
+      end_date: new Date(new Date().setMonth(new Date().getMonth() + 1)),
+      headline: '',
+      description: '',
+      keywords: [],
+      headlines: [],
+      descriptions: [],
+      final_url: '',
+      locations: [],
+      gender: 'all',
+      age_range: 'all',
+      devices: ['computers', 'mobile', 'tablets'],
+      language: 'en'
+    });
+    setNewHeadline('');
+    setNewDescription('');
+    setNewKeyword('');
+  };
+
   // Rename the function to better reflect its new purpose
   const handleCreateCampaignViaApi = async () => {
     try {
@@ -382,18 +444,40 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
       formattedData.customer_id = accountStatus.customerId;
       
       // Call the API to create the campaign
-      const response = await googleAdsApi.createCampaign(formattedData);
+      const campaignResponse = await googleAdsApi.createCampaign(formattedData);
       
-      // Show success message
-      setSuccess(`Campaign "${formattedData.campaign_name}" created successfully in Google Ads!`);
-      
-      // Close the dialog after a delay
-      setTimeout(() => {
-        handleClose();
-      }, 3000);
-    } catch (err) {
-      console.error('Error creating Google Ads campaign:', err);
-      setError(err.response?.data?.detail || 'Failed to create Google Ads campaign. Please try again.');
+      if (campaignResponse.success) {
+        setSuccess('Campaign created successfully!');
+        
+        // Reset form if creating from scratch
+        if (!initialData) {
+          resetForm();
+        }
+        
+        // Close the dialog after a delay
+        setTimeout(() => {
+          handleClose();
+          
+          // Trigger a callback if provided
+          if (onCampaignCreate) {
+            onCampaignCreate(campaignResponse.data);
+          }
+          
+          // Redirect to dashboard if not using in existing view
+          if (!initialData) {
+            navigate('/');
+          }
+        }, 2000);
+      } else {
+        setError(campaignResponse.message || 'Failed to create campaign');
+      }
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      // Fix: Ensure we're setting a string, not an object
+      const errorMessage = typeof error.response?.data?.detail === 'object' 
+        ? JSON.stringify(error.response?.data?.detail) 
+        : error.response?.data?.detail || 'Failed to create campaign. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -924,11 +1008,15 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
             setUnlinkSuccess(true);
           } else {
             setError('Failed to unlink account');
-        handleCloseUnlinkDialog();
+            handleCloseUnlinkDialog();
           }
         } catch (forceError) {
           console.error('Force unlink failed:', forceError);
-          setError('All unlink methods failed');
+          // Fix: Ensure we're setting a string, not an object
+          const errorMessage = typeof forceError.response?.data?.detail === 'object' 
+            ? JSON.stringify(forceError.response?.data?.detail) 
+            : forceError.response?.data?.detail || 'All unlink methods failed';
+          setError(errorMessage);
           handleCloseUnlinkDialog();
         }
       }
@@ -949,12 +1037,20 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
           setUnlinkConfirmStep(3);
           setUnlinkSuccess(true);
         } else {
-          setError('All unlink attempts failed');
-      handleCloseUnlinkDialog();
+          // Fix: Ensure we're setting a string, not an object
+          const errorMessage = typeof error.response?.data?.detail === 'object' 
+            ? JSON.stringify(error.response?.data?.detail) 
+            : error.response?.data?.detail || 'All unlink attempts failed';
+          setError(errorMessage);
+          handleCloseUnlinkDialog();
         }
       } catch (forceError) {
         console.error('Force unlink failed:', forceError);
-        setError('All unlink methods failed');
+        // Fix: Ensure we're setting a string, not an object
+        const errorMessage = typeof forceError.response?.data?.detail === 'object' 
+          ? JSON.stringify(forceError.response?.data?.detail) 
+          : forceError.response?.data?.detail || 'All unlink methods failed';
+        setError(errorMessage);
         handleCloseUnlinkDialog();
       }
     } finally {

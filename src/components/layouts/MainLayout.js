@@ -207,7 +207,12 @@ const MainLayout = () => {
             </Tooltip>
           )}
         </Box>
-        {canUseGoogleAds ? (
+        
+        {/* Always show the Link button since free users can now link external accounts */}
+        <GoogleAdsLinkButton />
+        
+        {/* Only show creation button for Pro users who can create accounts under our manager */}
+        {subscription?.features?.can_create_google_ads_account ? (
           <GoogleAdsCreationButton />
         ) : (
           <Button 
