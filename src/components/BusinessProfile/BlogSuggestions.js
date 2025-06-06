@@ -21,7 +21,8 @@ import {
   DialogActions,
   TextField,
   Chip,
-  Snackbar
+  Snackbar,
+  Tooltip
 } from '@mui/material';
 import CreateIcon from '@mui/icons-material/Create';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
@@ -30,6 +31,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import StarIcon from '@mui/icons-material/Star';
 import BookmarkIcon from '@mui/icons-material/Bookmark';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import businessProfileService from '../../services/businessProfileService';
 
 const BlogSuggestions = () => {
@@ -62,7 +64,15 @@ const BlogSuggestions = () => {
     
     try {
       const blogSuggestions = await businessProfileService.getBlogSuggestions();
-      setSuggestions(blogSuggestions);
+      
+      // Convert string array to objects with metadata and check if already saved
+      const formattedSuggestions = blogSuggestions.map(suggestion => ({
+        title: suggestion,
+        isSaving: false,
+        isSaved: savedSuggestions.some(saved => saved.title.toLowerCase() === suggestion.toLowerCase())
+      }));
+      
+      setSuggestions(formattedSuggestions);
       setGenerated(true);
     } catch (error) {
       console.error('Failed to get blog suggestions:', error);
@@ -77,8 +87,18 @@ const BlogSuggestions = () => {
     
     setLoading(true);
     try {
-      await businessProfileService.saveBlogSuggestionsBulk(suggestions);
+      // Extract titles from suggestion objects
+      const suggestionTitles = suggestions.map(suggestion => suggestion.title);
+      await businessProfileService.saveBlogSuggestionsBulk(suggestionTitles);
       await loadSavedSuggestions(); // Refresh saved suggestions
+      
+      // Mark all suggestions as saved
+      const updatedSuggestions = suggestions.map(suggestion => ({
+        ...suggestion,
+        isSaved: true
+      }));
+      setSuggestions(updatedSuggestions);
+      
       setSnackbar({
         open: true,
         message: 'Blog suggestions saved successfully!',
@@ -93,6 +113,59 @@ const BlogSuggestions = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Function to save a single blog suggestion
+  const saveSingleSuggestion = async (suggestionTitle, index) => {
+    // Create a copy of the suggestions array to track which ones are being saved
+    const updatedSuggestions = [...suggestions];
+    if (!updatedSuggestions[index].isSaving) {
+      updatedSuggestions[index] = { 
+        ...updatedSuggestions[index], 
+        isSaving: true
+      };
+      setSuggestions(updatedSuggestions);
+    }
+    
+    try {
+      await businessProfileService.createBlogSuggestion({
+        title: suggestionTitle,
+        description: '',
+        tags: ''
+      });
+      await loadSavedSuggestions(); // Refresh saved suggestions
+      
+      // Mark suggestion as saved
+      const finalSuggestions = [...suggestions];
+      finalSuggestions[index] = {
+        ...finalSuggestions[index],
+        isSaving: false,
+        isSaved: true
+      };
+      setSuggestions(finalSuggestions);
+      
+      setSnackbar({
+        open: true,
+        message: 'Blog suggestion saved successfully!',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to save suggestion:', error);
+      
+      // Reset saving state
+      const finalSuggestions = [...suggestions];
+      finalSuggestions[index] = {
+        ...finalSuggestions[index],
+        isSaving: false
+      };
+      setSuggestions(finalSuggestions);
+      
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.detail || 'Failed to save suggestion. Please try again.',
+        severity: 'error'
+      });
     }
   };
 
@@ -244,9 +317,35 @@ const BlogSuggestions = () => {
                           <CreateIcon fontSize="small" color="primary" />
                         </ListItemIcon>
                         <ListItemText 
-                          primary={suggestion}
+                          primary={suggestion.title}
                           primaryTypographyProps={{ fontWeight: 500 }}
                         />
+                        <ListItemSecondaryAction>
+                          <Tooltip title={
+                            suggestion.isSaving 
+                              ? "Saving..." 
+                              : suggestion.isSaved 
+                                ? "Already saved" 
+                                : "Save this suggestion"
+                          }>
+                            <span> {/* Wrapper needed to show tooltip on disabled button */}
+                              <IconButton 
+                                edge="end" 
+                                onClick={() => saveSingleSuggestion(suggestion.title, index)}
+                                color="primary"
+                                disabled={suggestion.isSaving || suggestion.isSaved}
+                              >
+                                {suggestion.isSaving ? (
+                                  <CircularProgress size={20} />
+                                ) : suggestion.isSaved ? (
+                                  <CheckCircleIcon color="success" />
+                                ) : (
+                                  <SaveIcon />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </ListItemSecondaryAction>
                       </ListItem>
                     </React.Fragment>
                   ))}

@@ -8,6 +8,7 @@ import { BusinessProfilePage } from './components/BusinessProfile';
 import FeedbackReview from './components/Chat/FeedbackReview';
 import SEOAnalysisPage from './pages/SEOAnalysisPage';
 import ComprehensiveAnalysis from './components/SEOAnalysis/ComprehensiveAnalysis';
+import ContactPage from './pages/ContactPage';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -35,6 +36,7 @@ import GoogleAdsAnalytics from './pages/GoogleAdsAnalytics';
 import ContentCalendarPage from './pages/ContentCalendarPage';
 import ContentCalendarView from './components/ContentCalendarView';
 import CampaignSharePage from './pages/CampaignSharePage';
+import CampaignSpendingPage from './pages/CampaignSpendingPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -70,8 +72,9 @@ function App() {
         <Route path="reset-password" element={<ResetPassword />} />
         <Route path="verify" element={<VerificationPage />} />
         
-        {/* Public Campaign Share Page */}
+        {/* Public Routes */}
         <Route path="campaign/share/:shareId" element={<CampaignSharePage />} />
+        <Route path="contact" element={<ContactPage />} />
 
         {/* Protected Routes */}
         <Route path="/" element={
@@ -95,6 +98,7 @@ function App() {
           <Route path="database-viewer" element={<DatabaseViewer />} />
           <Route path="business-profile" element={<BusinessProfilePage />} />
           <Route path="google-ads-analytics" element={<GoogleAdsAnalytics />} />
+          <Route path="campaign-spending" element={<CampaignSpendingPage />} />
           <Route path="content-calendar" element={<ContentCalendarPage />} />
           <Route path="content-calendar-view" element={<ContentCalendarView />} />
           <Route path="seo-analysis" element={<SEOAnalysisPage />} />

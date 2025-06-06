@@ -50,6 +50,19 @@ import {
   Analytics as AnalyticsIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
+import googleAdsApi from '../services/googleAdsApi';
+import GoogleAdsCampaignSpending from '../components/GoogleAdsCampaignSpending';
+
+// Helper function to parse date strings
+const getPeriodDateObject = (dateString) => {
+  if (typeof dateString === 'string' && dateString.length === 8) {
+    const year = dateString.substring(0, 4);
+    const month = dateString.substring(4, 6);
+    const day = dateString.substring(6, 8);
+    return { year, month, day };
+  }
+  return { year: '', month: '', day: '' };
+};
 
 // Tab Panel Component
 function TabPanel(props) {
@@ -80,6 +93,12 @@ const GoogleAdsAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tabValue, setTabValue] = useState(0);
+  const [accountStatus, setAccountStatus] = useState({
+    isLinked: false,
+    customerId: '',
+    connectionType: '',
+    availableFunds: 0
+  });
   
   const canUseGoogleAds = subscription?.features?.can_use_google_ads || false;
   
@@ -152,6 +171,34 @@ const GoogleAdsAnalytics = () => {
       setLoading(false);
     }
   }, [canUseGoogleAds]);
+  
+  // Fetch account status
+  useEffect(() => {
+    const fetchAccountStatus = async () => {
+      try {
+        const response = await googleAdsApi.getAccountStatus();
+        if (response.success) {
+          setAccountStatus(response.data);
+        }
+      } catch (err) {
+        console.error('Error fetching account status:', err);
+      }
+    };
+    
+    fetchAccountStatus();
+  }, []);
+  
+  // Handler to refresh account status
+  const handleRefreshAccountStatus = async () => {
+    try {
+      const response = await googleAdsApi.getAccountStatus();
+      if (response.success) {
+        setAccountStatus(response.data);
+      }
+    } catch (err) {
+      console.error('Error refreshing account status:', err);
+    }
+  };
   
   // Prepare data for device distribution pie chart
   const getDeviceDistributionData = () => {
@@ -263,8 +310,14 @@ const GoogleAdsAnalytics = () => {
         </Typography>
       </Paper>
       
+      {/* Add the Campaign Spending Component */}
+      <GoogleAdsCampaignSpending 
+        accountStatus={accountStatus} 
+        onRefreshAccountStatus={handleRefreshAccountStatus} 
+      />
+      
       {/* Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
+      <Grid container spacing={3} sx={{ mb: 3, mt: 3 }}>
         <Grid item xs={12} sm={6} md={3}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
@@ -446,9 +499,8 @@ const GoogleAdsAnalytics = () => {
                       dataKey="date" 
                       tickFormatter={(date) => {
                         // Format YYYYMMDD to MM/DD
-                        const year = date.substring(0, 4);
-                        const month = date.substring(4, 6);
-                        const day = date.substring(6, 8);
+                        // eslint-disable-next-line no-unused-vars
+                        const { month, year, day } = getPeriodDateObject(date);
                         return `${month}/${day}`;
                       }} 
                     />
@@ -460,9 +512,8 @@ const GoogleAdsAnalytics = () => {
                       }}
                       labelFormatter={(date) => {
                         // Format YYYYMMDD to YYYY-MM-DD
-                        const year = date.substring(0, 4);
-                        const month = date.substring(4, 6);
-                        const day = date.substring(6, 8);
+                        // eslint-disable-next-line no-unused-vars
+                        const { day, month, year } = getPeriodDateObject(date);
                         return `${year}-${month}-${day}`;
                       }}
                     />
@@ -709,9 +760,8 @@ const GoogleAdsAnalytics = () => {
                   dataKey="date" 
                   tickFormatter={(date) => {
                     // Format YYYYMMDD to MM/DD
-                    const year = date.substring(0, 4);
-                    const month = date.substring(4, 6);
-                    const day = date.substring(6, 8);
+                    // eslint-disable-next-line no-unused-vars
+                    const { month, year, day } = getPeriodDateObject(date);
                     return `${month}/${day}`;
                   }} 
                 />
@@ -720,9 +770,8 @@ const GoogleAdsAnalytics = () => {
                   formatter={(value) => formatNumber(value)}
                   labelFormatter={(date) => {
                     // Format YYYYMMDD to YYYY-MM-DD
-                    const year = date.substring(0, 4);
-                    const month = date.substring(4, 6);
-                    const day = date.substring(6, 8);
+                    // eslint-disable-next-line no-unused-vars
+                    const { day, month, year } = getPeriodDateObject(date);
                     return `${year}-${month}-${day}`;
                   }}
                 />
@@ -753,9 +802,8 @@ const GoogleAdsAnalytics = () => {
                   dataKey="date" 
                   tickFormatter={(date) => {
                     // Format YYYYMMDD to MM/DD
-                    const year = date.substring(0, 4);
-                    const month = date.substring(4, 6);
-                    const day = date.substring(6, 8);
+                    // eslint-disable-next-line no-unused-vars
+                    const { month, year, day } = getPeriodDateObject(date);
                     return `${month}/${day}`;
                   }} 
                 />
@@ -768,9 +816,8 @@ const GoogleAdsAnalytics = () => {
                   }}
                   labelFormatter={(date) => {
                     // Format YYYYMMDD to YYYY-MM-DD
-                    const year = date.substring(0, 4);
-                    const month = date.substring(4, 6);
-                    const day = date.substring(6, 8);
+                    // eslint-disable-next-line no-unused-vars
+                    const { day, month, year } = getPeriodDateObject(date);
                     return `${year}-${month}-${day}`;
                   }}
                 />

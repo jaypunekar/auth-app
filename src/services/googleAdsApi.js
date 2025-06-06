@@ -482,6 +482,17 @@ const googleAdsApi = {
       }
       throw error;
     }
+  },
+
+  // Update campaign spending data (manually trigger real-time spend tracking)
+  updateCampaignSpending: async () => {
+    try {
+      const response = await api.post('/google-ads/update-spending');
+      return response.data;
+    } catch (error) {
+      console.error('Error updating campaign spending:', error);
+      throw error;
+    }
   }
 };
 

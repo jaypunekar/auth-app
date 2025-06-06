@@ -31,6 +31,7 @@ import {
   ListItemSecondaryAction,
   Modal,
   Snackbar,
+  LinearProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -40,7 +41,9 @@ import {
   Close as CloseIcon,
   Google as GoogleIcon,
   ExpandMore as ExpandMoreIcon,
-  ExitToApp as ExitToAppIcon
+  ExitToApp as ExitToAppIcon,
+  Warning as WarningIcon,
+  LinkOff as LinkOffIcon
 } from '@mui/icons-material';
 import googleAdsApi from '../services/googleAdsApi';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
@@ -86,6 +89,13 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
   const [activeCampaignCount, setActiveCampaignCount] = useState(0);
   const [pauseCampaigns, setPauseCampaigns] = useState(false);
   const [unlinkSuccess, setUnlinkSuccess] = useState(false);
+
+  // Add new state for account limits
+  const [accountLimits, setAccountLimits] = useState({
+    linkedCount: 0,
+    maxAllowed: 3,
+    canLinkMore: true
+  });
 
   const navigate = useNavigate();
 
@@ -143,6 +153,15 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
       try {
         const response = await googleAdsApi.getAccountStatus();
         setAccountStatus(response.data);
+        
+        // Extract account limits information
+        if (response.data.account_limits) {
+          setAccountLimits({
+            linkedCount: response.data.account_limits.linked_count || 0,
+            maxAllowed: response.data.account_limits.max_allowed || 3,
+            canLinkMore: response.data.account_limits.can_link_more !== false
+          });
+        }
         
         // If the component is mounted and no active account, fetch unlinked accounts
         if (!response.data.is_linked) {
@@ -1078,416 +1097,238 @@ const GoogleAdsCreationButton = ({ initialData, open: externalOpen, onClose: ext
 
   const handleCloseModal = () => {
     setModalOpen(false);
+    setError(null);
+    setSuccess(null);
   };
 
   // Handle showing the unlink dialog
   const handleShowUnlinkDialog = () => {
     setShowUnlinkDialog(true);
-    setUnlinkConfirmStep(1);
   };
 
   return (
     <>
-      {!externalOpen && (
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<GoogleIcon />}
-          onClick={handleOpen}
-          sx={{ mb: 2 }}
-        >
-          Create Google Ads Campaign
-        </Button>
-      )}
+      <Button
+        variant="contained"
+        color="primary"
+        startIcon={<GoogleIcon />}
+        onClick={handleOpen}
+        sx={{ mr: 1 }}
+      >
+        Create Google Ads Campaign
+      </Button>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <GoogleIcon sx={{ mr: 1 }} />
-              <Typography variant="h6">Create Google Ads Campaign</Typography>
-            </Box>
-            <IconButton onClick={handleClose} size="small">
+          <Box display="flex" alignItems="center" justifyContent="space-between">
+            <Typography variant="h6">Create Google Ads Campaign</Typography>
+            <IconButton edge="end" color="inherit" onClick={handleClose} aria-label="close">
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        
+
         <DialogContent dividers>
           {!accountStatus.isLinked ? (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              You need to link your Google Ads account before creating campaigns. Please use the "Link Google Ads" button in the top bar.
-            </Alert>
-          ) : accountStatus.connectionType === 'created' && accountStatus.availableFunds <= 0 ? (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              Your Google Ads account has no funds available. Please add funds before creating campaigns.
-            </Alert>
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                You need to connect a Google Ads account before creating campaigns.
+              </Alert>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleOpenModal}
+                startIcon={<GoogleIcon />}
+              >
+                Connect Google Ads Account
+              </Button>
+            </Box>
           ) : (
-            <>
-              {error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {error}
-                </Alert>
-              )}
-              
-              {success && (
-                <Alert severity="success" sx={{ mb: 2 }}>
-                  {success}
-                </Alert>
-              )}
-              
-              {accountStatus.connectionType === 'created' && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  Available funds: ${accountStatus.availableFunds.toFixed(2)}
-                </Alert>
-              )}
-              
-              {/* Account Status & Unlink Button */}
-              {accountStatus.isLinked && (
-                <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #e0e0e0', p: 2, borderRadius: 1 }}>
-                  <Box>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Connected Account: {accountStatus.customerId}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Connection Type: {accountStatus.connectionType === 'created' ? 'Created by Us' : 'Linked External Account'}
-                    </Typography>
-                  </Box>
-                  {(accountStatus.connectionType === 'linked') && (
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      startIcon={<ExitToAppIcon />}
-                      onClick={handleUnlinkAccount}
-                      disabled={loading}
-                    >
-                      Unlink Account
-                    </Button>
-                  )}
-                </Box>
-              )}
-              
+            // Campaign creation form
+            <Box>
               <Stepper activeStep={activeStep} sx={{ mb: 3 }}>
-                {steps.map((label) => (
-                  <Step key={label}>
-                    <StepLabel>{label}</StepLabel>
-                  </Step>
-                ))}
+                <Step>
+                  <StepLabel>Campaign Details</StepLabel>
+                </Step>
+                <Step>
+                  <StepLabel>Ad Content</StepLabel>
+                </Step>
+                <Step>
+                  <StepLabel>Targeting</StepLabel>
+                </Step>
+                <Step>
+                  <StepLabel>Review</StepLabel>
+                </Step>
               </Stepper>
-              
               {getStepContent(activeStep)}
-            </>
+            </Box>
           )}
         </DialogContent>
-        
-        <DialogActions>
-          <Button onClick={handleClose} color="inherit">
-            Cancel
-          </Button>
-          
-          {accountStatus.isLinked && (
-            <>
-              {activeStep > 0 && (
-                <Button onClick={handleBack} color="inherit">
-                  Back
-                </Button>
-              )}
-              
-              {activeStep < steps.length - 1 ? (
-                <Button 
-                  onClick={handleNext} 
-                  variant="contained" 
-                  color="primary"
-                  disabled={!validateStep()}
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleCreateCampaignViaApi} 
-                  variant="contained" 
-                  color="primary"
-                  startIcon={<GoogleIcon />}
-                  disabled={loading}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Create Google Ads using API'}
-                </Button>
-              )}
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
 
-      {/* Unlink Account Confirmation Dialog Series */}
-      <Dialog 
-        open={showUnlinkDialog} 
-        onClose={handleCloseUnlinkDialog}
-        maxWidth="sm" 
-        fullWidth
-      >
-        {/* Step 1: Active Campaign Warning */}
-        {unlinkConfirmStep === 1 && (
-          <>
-            <DialogTitle>
-              {hasActiveCampaigns ? 'Active Campaigns Detected' : 'Unlink Google Ads Account'}
-            </DialogTitle>
-            <DialogContent>
-              {hasActiveCampaigns ? (
-                <>
-                  <Alert severity="warning" sx={{ mb: 2 }}>
-                    You have {activeCampaignCount} active {activeCampaignCount === 1 ? 'campaign' : 'campaigns'} in your Google Ads account.
-                  </Alert>
-                  <Typography variant="body1" gutterBottom>
-                    Do you want to pause your active campaigns and unlink your account anyway?
-                  </Typography>
-                </>
-              ) : (
-                <Typography variant="body1" gutterBottom>
-                  Are you sure you want to unlink your Google Ads account?
-                </Typography>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => handleFirstConfirmStep(false)}>
-                No, Keep My Account
-              </Button>
-              <Button 
-                onClick={() => handleFirstConfirmStep(true)} 
-                color="primary" 
-                variant="contained"
-                disabled={loading}
-              >
-                {hasActiveCampaigns ? 'Yes, Pause and Unlink Anyway' : 'Yes, Continue'}
-              </Button>
-            </DialogActions>
-          </>
-        )}
-        
-        {/* Step 2: Data Deletion Warning */}
-        {unlinkConfirmStep === 2 && (
-          <>
-            <DialogTitle>Confirm Account Unlinking</DialogTitle>
-            <DialogContent>
-              <Alert severity="warning" sx={{ mb: 2 }}>
-                Unlinking your account will delete your connection data from our system.
-              </Alert>
-              <Typography variant="body1" gutterBottom>
-                Are you sure you want to unlink your Google Ads account?
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => handleSecondConfirmStep(false)}>
-                No, Keep My Account
-              </Button>
-              <Button 
-                onClick={() => handleSecondConfirmStep(true)} 
-                color="primary" 
-                variant="contained"
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Yes, Unlink My Account'}
-              </Button>
-            </DialogActions>
-          </>
-        )}
-        
-        {/* Step 3: Success and Add Different Account */}
-        {unlinkConfirmStep === 3 && unlinkSuccess && (
-          <>
-            <DialogTitle>Account Successfully Unlinked</DialogTitle>
-            <DialogContent>
-              <Alert severity="success" sx={{ mb: 2 }}>
-                Your account will be deleted from our system within 24 hours.
-              </Alert>
-              <Typography variant="body1" gutterBottom>
-                Would you like to add a different Google Ads account?
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => handleAddDifferentAccount(false)}>
-                No
-              </Button>
-              <Button 
-                onClick={() => handleAddDifferentAccount(true)} 
-                color="primary" 
-                variant="contained"
-              >
-                Yes
-              </Button>
-            </DialogActions>
-          </>
+        {accountStatus.isLinked && (
+          <DialogActions>
+            <Button
+              onClick={handleBack}
+              disabled={activeStep === 0}
+            >
+              Back
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={activeStep === 3 ? handleCreateCampaignViaApi : handleNext}
+              disabled={!validateStep()}
+            >
+              {activeStep === 3 ? 'Create Campaign' : 'Next'}
+            </Button>
+          </DialogActions>
         )}
       </Dialog>
 
-      <Button 
-        variant="contained" 
-        color="primary" 
-        onClick={handleOpenModal}
-        sx={{ mb: 2 }}
-      >
-        {accountStatus && accountStatus.is_linked ? 
-          "Manage Google Ads" : 
-          "Create Google Ads Account"
-        }
-      </Button>
-      
+      {/* Google Ads Account Modal */}
       <Modal
         open={modalOpen}
         onClose={handleCloseModal}
+        aria-labelledby="google-ads-account-modal"
       >
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Google Ads Account
           </Typography>
           
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
-          
-          {accountStatus && accountStatus.is_linked ? (
-            // User has an active Google Ads account
-            <Box>
-              <Typography variant="body1" gutterBottom>
-                You have an active Google Ads account.
+          {/* Account Limits Information */}
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Account Limits
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <LinearProgress 
+                variant="determinate" 
+                value={(accountLimits.linkedCount / accountLimits.maxAllowed) * 100} 
+                sx={{ flexGrow: 1, mr: 2, height: 10, borderRadius: 5 }}
+              />
+              <Typography variant="body2">
+                {accountLimits.linkedCount} / {accountLimits.maxAllowed}
               </Typography>
-              <Typography variant="body2" paragraph>
-                Account ID: <strong>{accountStatus.customer_id}</strong>
-              </Typography>
-              
-              {accountStatus.connection_type === "created" && (
-                <Box>
-                  <Typography variant="body2">
-                    Available Funds: <strong>${accountStatus.available_funds.toFixed(2)}</strong>
-                  </Typography>
-                  <Typography variant="body2" paragraph>
-                    You can add funds to your account or create campaigns directly.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => navigate("/google-ads")}
-                    sx={{ mt: 1 }}
-                  >
-                    Manage Account
-                  </Button>
-                </Box>
-              )}
-              
-              <Button
-                variant="outlined"
-                color="error"
-                onClick={handleShowUnlinkDialog}
-                sx={{ mt: 2 }}
+            </Box>
+            {!accountLimits.canLinkMore && (
+              <Alert 
+                severity="warning" 
+                icon={<WarningIcon />}
+                sx={{ mt: 1 }}
               >
-                Unlink Account
-              </Button>
+                You've reached your account limit. Please upgrade your subscription to link more accounts.
+              </Alert>
+            )}
+          </Box>
+          
+          {accountStatus.isLinked ? (
+            <Box>
+              <Alert severity="success" sx={{ mb: 2 }}>
+                Your Google Ads account is connected and ready to use.
+              </Alert>
+              <Typography variant="body1" gutterBottom>
+                <strong>Account ID:</strong> {accountStatus.customerId}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                <strong>Type:</strong> {accountStatus.connectionType === 'created' ? 'Created by us' : 'Linked external account'}
+              </Typography>
+              {accountStatus.connectionType === 'created' && (
+                <Typography variant="body1" gutterBottom>
+                  <strong>Available Funds:</strong> ${accountStatus.availableFunds.toFixed(2)}
+                </Typography>
+              )}
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Button 
+                  variant="outlined" 
+                  color="error" 
+                  onClick={handleShowUnlinkDialog}
+                  startIcon={<LinkOffIcon />}
+                >
+                  Unlink Account
+                </Button>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={handleCloseModal}
+                >
+                  Continue
+                </Button>
+              </Box>
             </Box>
           ) : (
-            // User does not have an active account
             <Box>
-              {/* Unlinked Accounts Section */}
+              <Alert severity="info" sx={{ mb: 2 }}>
+                You need to connect a Google Ads account to create campaigns.
+              </Alert>
+              
+              {/* Show unlinked accounts if available */}
               {unlinkedAccounts.length > 0 && (
-                <Box mb={3}>
-                  <Typography variant="h6" gutterBottom>
-                    Your Unlinked Accounts
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Previously Unlinked Accounts
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" paragraph>
-                    You can relink one of your previously unlinked accounts:
-                  </Typography>
-                  
-                  {loadingUnlinkedAccounts ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
-                      <CircularProgress size={24} />
-                    </Box>
-                  ) : (
-                    <List>
-                      {unlinkedAccounts.map((account) => (
-                        <ListItem
-                          key={account.id}
-                          sx={{
-                            border: 1,
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            mb: 1,
-                            bgcolor: 'background.paper'
-                          }}
-                        >
-                          <ListItemText
-                            primary={
-                              <Typography fontWeight="bold">
-                                {account.customer_id} 
-                                {account.connection_type === 'created' && 
-                                  <Chip 
-                                    size="small" 
-                                    color="success" 
-                                    label={`$${account.available_funds.toFixed(2)} available`} 
-                                    sx={{ ml: 1 }}
-                                  />
-                                }
-                              </Typography>
-                            }
-                            secondary={
-                              <>
-                                {account.connection_type === 'created' ? 'Created account' : 'Linked account'}
-                                <br />
-                                Unlinked on: {new Date(account.unlinked_at).toLocaleDateString()}
-                              </>
-                            }
-                          />
-                          <ListItemSecondaryAction>
-                            <Button
-                              variant="contained"
-                              size="small"
-                              color="primary"
-                              onClick={() => handleRelinkAccount(account.id)}
-                              disabled={loading}
-                            >
-                              {loading ? <CircularProgress size={24} /> : 'Relink'}
-                            </Button>
-                          </ListItemSecondaryAction>
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
+                  <List dense>
+                    {unlinkedAccounts.map(account => (
+                      <ListItem key={account.id} divider>
+                        <ListItemText
+                          primary={account.customer_id}
+                          secondary={`Unlinked: ${new Date(account.unlinked_at).toLocaleDateString()}`}
+                        />
+                        <ListItemSecondaryAction>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleRelinkAccount(account.id)}
+                            disabled={loading || !accountLimits.canLinkMore}
+                          >
+                            Relink
+                          </Button>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
                 </Box>
               )}
-            
-              <Typography variant="body1" paragraph>
-                Create a new Google Ads account to start advertising your business.
-              </Typography>
               
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleCreateAccount}
-                disabled={loading}
-                fullWidth
-              >
-                {loading ? <CircularProgress size={24} /> : 'Create New Account'}
-              </Button>
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <Button 
+                  variant="contained" 
+                  color="primary" 
+                  onClick={handleCreateAccount}
+                  startIcon={<GoogleIcon />}
+                  disabled={loading || !accountLimits.canLinkMore}
+                >
+                  {loading ? <CircularProgress size={24} /> : "Create New Account"}
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  component={RouterLink} 
+                  to="/settings/google-ads"
+                  startIcon={<ExitToAppIcon />}
+                >
+                  Link Existing Account
+                </Button>
+              </Box>
               
-              <Divider sx={{ my: 2 }} />
+              {error && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {error}
+                </Alert>
+              )}
               
-              <Typography variant="body2" color="text.secondary">
-                You can also <RouterLink to="/google-ads">link an existing Google Ads account</RouterLink> if you already have one.
-              </Typography>
+              {success && (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  {success}
+                </Alert>
+              )}
             </Box>
           )}
-          
-          <Button 
-            onClick={handleCloseModal} 
-            sx={{ mt: 2 }}
-          >
-            Close
-          </Button>
         </Box>
       </Modal>
       

@@ -25,7 +25,8 @@ import {
   ListItem,
   ListItemText,
   ListItemSecondaryAction,
-  InputAdornment
+  InputAdornment,
+  LinearProgress
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -33,6 +34,7 @@ import MoneyIcon from '@mui/icons-material/Money';
 import LinkOffIcon from '@mui/icons-material/LinkOff';
 import HistoryIcon from '@mui/icons-material/History';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import WarningIcon from '@mui/icons-material/Warning';
 import googleAdsApi from '../services/googleAdsApi';
 
 const GoogleAdsLinkButton = () => {
@@ -80,6 +82,13 @@ const GoogleAdsLinkButton = () => {
   const [pauseCampaigns, setPauseCampaigns] = useState(false);
   const [unlinkSuccess, setUnlinkSuccess] = useState(false);
 
+  // Add new state for account limits
+  const [accountLimits, setAccountLimits] = useState({
+    linkedCount: 0,
+    maxAllowed: 3,
+    canLinkMore: true
+  });
+
   const steps = ['Select Account Type', 'Enter Account ID', 'Link Status'];
 
   // Define the checkAccountStatus function at component level so it can be used in multiple places
@@ -95,6 +104,15 @@ const GoogleAdsLinkButton = () => {
           hasPreviousAccounts: response.data.has_previous_accounts || false,
           previousAccounts: response.data.previous_accounts || []
         };
+        
+        // Extract account limits information
+        if (response.data.account_limits) {
+          setAccountLimits({
+            linkedCount: response.data.account_limits.linked_count || 0,
+            maxAllowed: response.data.account_limits.max_allowed || 3,
+            canLinkMore: response.data.account_limits.can_link_more !== false
+          });
+        }
         
         // If status changed from linked to unlinked, reset the component and notify
         if (accountStatus.isLinked && !newStatus.isLinked) {
@@ -483,27 +501,55 @@ const GoogleAdsLinkButton = () => {
     switch (step) {
       case 0:
         return (
-          <Box>
-            <FormControl component="fieldset" fullWidth>
-              <FormLabel component="legend">Account Type</FormLabel>
-            <RadioGroup
+          <Box sx={{ mt: 2 }}>
+            {/* Account Limits Information */}
+            <Box sx={{ mb: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Account Limits
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={(accountLimits.linkedCount / accountLimits.maxAllowed) * 100} 
+                  sx={{ flexGrow: 1, mr: 2, height: 10, borderRadius: 5 }}
+                />
+                <Typography variant="body2">
+                  {accountLimits.linkedCount} / {accountLimits.maxAllowed}
+                </Typography>
+              </Box>
+              {!accountLimits.canLinkMore && (
+                <Alert 
+                  severity="warning" 
+                  icon={<WarningIcon />}
+                  sx={{ mt: 1 }}
+                >
+                  You've reached your account limit. Please upgrade your subscription to link more accounts.
+                </Alert>
+              )}
+            </Box>
+
+            <FormControl component="fieldset">
+              <FormLabel component="legend">Select Account Type</FormLabel>
+              <RadioGroup
                 aria-label="account-type"
                 name="account-type"
-              value={accountType}
-              onChange={handleAccountTypeChange}
-            >
-              <FormControlLabel 
-                value="new" 
-                control={<Radio />} 
-                label="Create a new Google Ads account" 
-              />
-              <FormControlLabel 
-                value="existing" 
-                control={<Radio />} 
-                label="Link an existing Google Ads account" 
-              />
-            </RadioGroup>
-          </FormControl>
+                value={accountType}
+                onChange={handleAccountTypeChange}
+              >
+                <FormControlLabel 
+                  value="new" 
+                  control={<Radio />} 
+                  label="Create a new Google Ads account" 
+                  disabled={!accountLimits.canLinkMore}
+                />
+                <FormControlLabel 
+                  value="existing" 
+                  control={<Radio />} 
+                  label="Link an existing Google Ads account" 
+                  disabled={!accountLimits.canLinkMore}
+                />
+              </RadioGroup>
+            </FormControl>
             
             {/* Unlinked Accounts Section */}
             {unlinkedAccounts.length > 0 && (

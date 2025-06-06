@@ -47,7 +47,8 @@ import {
   ExpandLess as ExpandLessIcon,
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
-  Search as SearchIcon
+  Search as SearchIcon,
+  MonetizationOn as MonetizationOnIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -174,6 +175,7 @@ const MainLayout = () => {
     { text: 'Instagram Analyzer', icon: <InstagramIcon />, path: '/instagram-analyzer' },
     { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },
     { text: 'Google Ads Analytics', icon: <AnalyticsIcon />, path: '/google-ads-analytics' },
+    { text: 'Campaign Spending', icon: <MonetizationOnIcon />, path: '/campaign-spending' },
     { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
   ];
 
@@ -210,6 +212,19 @@ const MainLayout = () => {
         
         {/* Always show the Link button since free users can now link external accounts */}
         <GoogleAdsLinkButton />
+        
+        {/* Add Campaign Spending button */}
+        <Button
+          variant="outlined"
+          color="primary"
+          startIcon={<MonetizationOnIcon />}
+          onClick={() => navigate('/campaign-spending')}
+          fullWidth
+          sx={{ mb: 1 }}
+          disabled={!canUseGoogleAds}
+        >
+          Campaign Spending
+        </Button>
         
         {/* Add a Check Status button if an account is pending */}
         {accountStatus.customerId && !accountStatus.isLinked && (
