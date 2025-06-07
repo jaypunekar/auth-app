@@ -318,7 +318,7 @@ const MainLayout = () => {
         </Box>
         
         <Box sx={{ mb: 2 }}>
-          <CreditDisplay showIcon={false} size="small" />
+          <CreditDisplay showIcon={false} size="small" showBuyButton={true} />
         </Box>
         
         {showUpgradeButton && (
@@ -376,8 +376,7 @@ const MainLayout = () => {
           
           {/* Credits display */}
           <CreditDisplay 
-            showBuyButton={showUpgradeButton}
-            onBuyCredits={() => navigate('/subscriptions')}
+            showBuyButton={true}
             size="small"
             sx={{ mr: 2, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 1, px: 1, py: 0.5 }}
           />

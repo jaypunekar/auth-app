@@ -5,6 +5,7 @@ import VerifiedIcon from '@mui/icons-material/Verified';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import { CreditRefreshContext } from './ImageGeneration/ImageGenerator';
+import CreditPurchaseDialog from './CreditPurchaseDialog';
 
 /**
  * Component to display user credit information
@@ -27,6 +28,7 @@ const CreditDisplay = ({
   const [credits, setCredits] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
   
   // Get the refreshTrigger from context (if available)
   const creditRefreshContext = useContext(CreditRefreshContext);
@@ -114,6 +116,20 @@ const CreditDisplay = ({
     return 'success';
   };
 
+  const handleBuyCreditsClick = () => {
+    if (onBuyCredits) {
+      onBuyCredits();
+    } else {
+      setShowPurchaseDialog(true);
+    }
+  };
+
+  const handlePurchaseSuccess = () => {
+    // Refresh credits after successful purchase
+    fetchCredits();
+    setShowPurchaseDialog(false);
+  };
+
   return (
     <Box 
       sx={{ 
@@ -154,7 +170,7 @@ const CreditDisplay = ({
               size="small" 
               variant="outlined" 
               color="primary"
-              onClick={onBuyCredits}
+              onClick={handleBuyCreditsClick}
               startIcon={<VerifiedIcon />}
               sx={{ ml: 1, fontSize: variant.fontSize }}
             >
@@ -163,6 +179,13 @@ const CreditDisplay = ({
           )}
         </>
       )}
+
+      {/* Credit purchase dialog */}
+      <CreditPurchaseDialog
+        open={showPurchaseDialog}
+        onClose={() => setShowPurchaseDialog(false)}
+        onSuccess={handlePurchaseSuccess}
+      />
     </Box>
   );
 };

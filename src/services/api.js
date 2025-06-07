@@ -546,7 +546,14 @@ export const googleAdsAPI = {
   },
 };
 
-// Add a new API service for image generation
+// Credits API
+export const creditsAPI = {
+  getCredits: () => api.get('/images/credits'),
+  getPackages: () => api.get('/images/credit-packages'),
+  purchaseCredits: (packageId) => api.post('/google-ads/purchase-credits', { package: packageId }),
+};
+
+// Image API
 export const imageAPI = {
   generateImage: (prompt) => {
     return api.post('/images/generate', { prompt });

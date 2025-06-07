@@ -94,6 +94,9 @@ const GoogleAdsLinkButton = () => {
   // Define the checkAccountStatus function at component level so it can be used in multiple places
   const checkAccountStatus = async () => {
     try {
+      // Set loading state while checking status
+      setLoading(true);
+      
       const response = await googleAdsApi.getAccountStatus();
       if (response && response.data) {
         const newStatus = {
@@ -149,6 +152,8 @@ const GoogleAdsLinkButton = () => {
       }
     } catch (error) {
       console.error('Error checking Google Ads account status:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -180,15 +185,15 @@ const GoogleAdsLinkButton = () => {
     }
   }, [customerId, activeStep]);
 
-  // Check if the user already has a linked account and refresh status periodically
+  // Check if the user already has a linked account and refresh status only when mounted
   useEffect(() => {
     // Check immediately on mount
     checkAccountStatus();
     
-    // Then check every 5 minutes
-    const intervalId = setInterval(checkAccountStatus, 5 * 60 * 1000);
+    // No interval for automatic status checks - rely on manual refreshes instead
+    // This reduces backend load by preventing frequent API calls
     
-    return () => clearInterval(intervalId);
+    return () => {}; // No interval to clear
   }, [accountStatus.isLinked]);
 
   // Fetch previously linked accounts when dialog opens
@@ -1013,6 +1018,13 @@ const GoogleAdsLinkButton = () => {
         You'll need to accept the invitation in your Google Ads account before the link can be established.
         We've sent an email with instructions to your registered email address.
       </Typography>
+      
+      <Alert severity="info" sx={{ mt: 2 }}>
+        <Typography variant="body2">
+          <strong>Note:</strong> To reduce server load, status is not checked automatically. 
+          Please use the button above to manually check if your account has been linked.
+        </Typography>
+      </Alert>
     </Box>
   );
 
@@ -1039,22 +1051,41 @@ const GoogleAdsLinkButton = () => {
               <CheckCircleIcon sx={{ mr: 1 }} /> 
               Connected to Google Ads {accountStatus.customerId && `(${accountStatus.customerId})`}
             </Typography>
-      <Button
-              variant="outlined" 
-              size="small" 
-              color="error"
-              onClick={handleUnlinkAccount}
-              startIcon={<LinkOffIcon />}
-              sx={{ 
-                bgcolor: 'white', 
-                '&:hover': {
-                  bgcolor: 'error.light',
-                  color: 'white'
-                } 
-              }}
-      >
-              Unlink
-      </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined" 
+                size="small" 
+                color="primary"
+                onClick={checkAccountStatus}
+                disabled={loading}
+                startIcon={<RefreshIcon />}
+                sx={{ 
+                  bgcolor: 'white', 
+                  '&:hover': {
+                    bgcolor: 'primary.light',
+                    color: 'white'
+                  } 
+                }}
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+              <Button
+                variant="outlined" 
+                size="small" 
+                color="error"
+                onClick={handleUnlinkAccount}
+                startIcon={<LinkOffIcon />}
+                sx={{ 
+                  bgcolor: 'white', 
+                  '&:hover': {
+                    bgcolor: 'error.light',
+                    color: 'white'
+                  } 
+                }}
+              >
+                Unlink
+              </Button>
+            </Box>
           </Box>
                 
                 {accountStatus.connectionType === 'created' && (
