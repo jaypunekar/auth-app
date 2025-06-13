@@ -22,7 +22,14 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  useTheme
+  useTheme,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  TextField,
+  Snackbar
 } from '@mui/material';
 import {
   BarChart,
@@ -47,7 +54,8 @@ import {
   MonetizationOn as MonetizationOnIcon,
   Visibility as VisibilityIcon,
   TouchApp as TouchAppIcon,
-  Analytics as AnalyticsIcon
+  Analytics as AnalyticsIcon,
+  Share as ShareIcon
 } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import googleAdsApi from '../services/googleAdsApi';
@@ -99,6 +107,11 @@ const GoogleAdsAnalytics = () => {
     connectionType: '',
     availableFunds: 0
   });
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [shareLoading, setShareLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
   
   const canUseGoogleAds = subscription?.features?.can_use_google_ads || false;
   
@@ -227,6 +240,45 @@ const GoogleAdsAnalytics = () => {
       }));
   };
   
+  // Handle share dialog
+  const handleOpenShareDialog = () => {
+    setShareDialogOpen(true);
+  };
+  
+  const handleCloseShareDialog = () => {
+    setShareDialogOpen(false);
+  };
+  
+  const handleEmailChange = (e) => {
+    setShareEmail(e.target.value);
+  };
+  
+  const handleShareAnalytics = async () => {
+    try {
+      setShareLoading(true);
+      
+      const response = await googleAdsApi.shareAnalyticsViaEmail(shareEmail);
+      
+      if (response.success) {
+        setSnackbarMessage(`Analytics report sent to ${shareEmail}`);
+        setSnackbarOpen(true);
+        handleCloseShareDialog();
+      } else {
+        setSnackbarMessage(`Error: ${response.message}`);
+        setSnackbarOpen(true);
+      }
+    } catch (err) {
+      setSnackbarMessage(`Error sending email: ${err.response?.data?.detail || 'Unknown error'}`);
+      setSnackbarOpen(true);
+    } finally {
+      setShareLoading(false);
+    }
+  };
+  
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+  
   // Render loading state
   if (loading) {
     return (
@@ -301,16 +353,69 @@ const GoogleAdsAnalytics = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          <AnalyticsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          Google Ads Analytics Dashboard
-        </Typography>
-        <Typography variant="body2" color="textSecondary" gutterBottom>
-          Comprehensive analytics for all your Google Ads campaigns in one place.
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Box>
+            <Typography variant="h5" gutterBottom>
+              <AnalyticsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+              Google Ads Analytics Dashboard
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Comprehensive analytics for all your Google Ads campaigns in one place.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<ShareIcon />}
+            onClick={handleOpenShareDialog}
+          >
+            Share Report
+          </Button>
+        </Box>
       </Paper>
       
-      {/* Add the Campaign Spending Component */}
+      {/* Share Dialog */}
+      <Dialog open={shareDialogOpen} onClose={handleCloseShareDialog}>
+        <DialogTitle>Share Analytics Report</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Enter an email address to send the complete analytics report as a CSV attachment.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="email"
+            label="Email Address"
+            type="email"
+            fullWidth
+            variant="outlined"
+            value={shareEmail}
+            onChange={handleEmailChange}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseShareDialog}>Cancel</Button>
+          <Button 
+            onClick={handleShareAnalytics} 
+            color="primary" 
+            variant="contained"
+            disabled={shareLoading || !shareEmail}
+          >
+            {shareLoading ? 'Sending...' : 'Send Report'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Success/Error Snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+      />
+      
+      {/* Campaign Spending Component */}
       <GoogleAdsCampaignSpending 
         accountStatus={accountStatus} 
         onRefreshAccountStatus={handleRefreshAccountStatus} 

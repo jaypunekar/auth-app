@@ -493,6 +493,23 @@ const googleAdsApi = {
       console.error('Error updating campaign spending:', error);
       throw error;
     }
+  },
+
+  // Share analytics via email
+  shareAnalyticsViaEmail: async (email) => {
+    try {
+      console.log(`Sharing analytics report with email: ${email}`);
+      const response = await api.post('/google-ads/share-analytics-email', { email });
+      console.log('Share analytics response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error sharing analytics via email:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
   }
 };
 

@@ -11,6 +11,7 @@ import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CloseIcon from '@mui/icons-material/Close';
 import CodeIcon from '@mui/icons-material/Code';
+import StopIcon from '@mui/icons-material/Stop';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -31,12 +32,31 @@ const WebSocketChat = () => {
   const [activeSessionIndex, setActiveSessionIndex] = useState(0);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [currentRunInfo, setCurrentRunInfo] = useState(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const webSocketRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [sessionMenuAnchor, setSessionMenuAnchor] = useState(null);
   const lastSessionIdRef = useRef({});
   const [previousSessions, setPreviousSessions] = useState([]);
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false);
+  const [isDisplayStopped, setIsDisplayStopped] = useState(false);
+  const [messageBuffer, setMessageBuffer] = useState("");
+  const streamSpeedRef = useRef(null);
+
+  // Debug flag - set to true to enable console debugging
+  const DEBUG = true;
+  
+  // Add debug logger function
+  const debugLog = (message, data) => {
+    if (DEBUG) {
+      if (data) {
+        console.log(`[DEBUG] ${message}`, data);
+      } else {
+        console.log(`[DEBUG] ${message}`);
+      }
+    }
+  };
 
   // CSS for the pulsing animation
   const pulseAnimation = `
@@ -63,6 +83,7 @@ const WebSocketChat = () => {
 
   // Get active session data
   const activeSession = sessions && sessions[activeSessionIndex] ? sessions[activeSessionIndex] : null;
+  const isResponseStreaming = activeSession?.isTyping || false;
 
   // Ensure sessions is always an array
   useEffect(() => {
@@ -134,18 +155,83 @@ const WebSocketChat = () => {
       // Listen for messages
       ws.onmessage = (event) => {
         try {
-          console.log('Raw WebSocket message received:', event.data);
+          debugLog('Raw WebSocket message received:', event.data);
           let data;
           
           try {
             data = JSON.parse(event.data);
           } catch (parseError) {
             console.error('Error parsing WebSocket message:', parseError);
-            console.log('Attempting to handle as non-JSON message');
+            debugLog('Attempting to handle as non-JSON message');
             data = { type: 'text', content: event.data };
           }
           
-          console.log('Parsed WebSocket message:', data);
+          debugLog('Parsed WebSocket message:', data);
+          
+          // Handle run_created event
+          if (data.type === 'run_created') {
+            debugLog('Run created event received at: ' + new Date().toISOString(), data.content);
+            try {
+              const runInfo = JSON.parse(data.content);
+              setCurrentRunInfo(runInfo);
+              debugLog('Run info stored:', runInfo);
+            } catch (error) {
+              console.error('Error parsing run info:', error);
+            }
+            return;
+          }
+          
+          // Handle cancelled event
+          if (data.type === 'cancelled') {
+            debugLog('Response cancelled event received at: ' + new Date().toISOString());
+            setIsCancelling(false);
+            
+            // Update the session to stop showing typing indicator and save partial response
+            setSessions(prevSessions => {
+              const updatedSessions = prevSessions.map(session => {
+                if (session.isTyping) {
+                  debugLog('Found session to cancel typing for:', session.sessionId);
+                  // Create a meaningful message
+                  const cancelMessage = { 
+                    role: 'system', 
+                    content: 'Response generation cancelled by user.',
+                    isCancelled: true
+                  };
+                  
+                  // If there's a partial response, include it
+                  const messages = [...session.messages];
+                  if (session.currentStreamedMessage && session.currentStreamedMessage.trim()) {
+                    debugLog('Saving partial message of length: ' + session.currentStreamedMessage.length);
+                    messages.push({ 
+                      role: 'assistant', 
+                      content: session.currentStreamedMessage + ' [cancelled]',
+                      isCancelled: true
+                    });
+                  } else {
+                    debugLog('No partial message to save');
+                  }
+                  
+                  // Add the cancellation message
+                  messages.push(cancelMessage);
+                  
+                  return {
+                    ...session,
+                    isTyping: false,
+                    currentStreamedMessage: '',
+                    messages
+                  };
+                }
+                return session;
+              });
+              
+              return updatedSessions;
+            });
+            
+            // Clear current run info
+            setCurrentRunInfo(null);
+            debugLog('Cancellation complete, reset states');
+            return;
+          }
           
           // Handle previous_sessions message
           if (data.type === 'previous_sessions') {
@@ -681,32 +767,59 @@ const WebSocketChat = () => {
             .replace(/\\"/g, '"');  // Unescape quotes
         }
         
-        // Append to the current streamed message
+      // If display is stopped or this session was cancelled, buffer the content instead of showing it
+      if (session.isDisplayStopped || session.isCancelled) {
+        debugLog(`Buffering content for session ${session.sessionId} instead of displaying (display stopped: ${session.isDisplayStopped}, cancelled: ${session.isCancelled})`);
+        updatedSession.messageBuffer = (updatedSession.messageBuffer || "") + wordToAdd;
+        return updatedSession;
+      }
+      
+      // Otherwise, append to the current streamed message
         updatedSession.currentStreamedMessage = (updatedSession.currentStreamedMessage || '') + wordToAdd;
-        console.log(`Added streaming content to session ${session.sessionId}, length now: ${updatedSession.currentStreamedMessage.length}`);
+      debugLog(`Added streaming content to session ${session.sessionId}, length now: ${updatedSession.currentStreamedMessage.length}`);
         break;
       
       case 'stream_end':
+        // If display was stopped or the session was already cancelled, ignore stream_end
+        if (session.isDisplayStopped || session.isCancelled) {
+          debugLog(`Ignoring stream_end for session ${session.sessionId} because display was stopped or cancelled`);
+          // Do NOT reset any flags here, maintain cancelled state
+          return updatedSession; // Important: Return without changing state
+        }
+        
         // Important: Add the streamed message to the permanent messages array
         if (updatedSession.currentStreamedMessage) {
           updatedSession.messages = [
             ...updatedSession.messages,
             { role: 'assistant', content: updatedSession.currentStreamedMessage || '' }
           ];
-          console.log(`Added complete message to session ${session.sessionId}, message count: ${updatedSession.messages.length}`);
+          debugLog(`Added complete message to session ${session.sessionId}, message count: ${updatedSession.messages.length}`);
         } else {
-          console.warn(`No streamed content to add for session ${session.sessionId}`);
+          debugLog(`No streamed content to add for session ${session.sessionId}`);
         }
         updatedSession.isTyping = false;
+        updatedSession.currentStreamedMessage = '';
+        updatedSession.messageBuffer = '';
+        setCurrentRunInfo(null);
+        setIsCancelling(false); // Make sure we reset cancelling state
         break;
       
       case 'error':
+        // If we get an error about no active run to cancel, ignore it if display was stopped
+        if (data.content && data.content.includes("No active run found to cancel") && 
+            (session.isDisplayStopped || session.isCancelling)) {
+          debugLog(`Ignoring "no active run" error since we're handling cancellation client-side`);
+          break;
+        }
+        
         updatedSession.messages = [
           ...updatedSession.messages,
           { role: 'system', content: `Error: ${data.content}` }
         ];
         updatedSession.isTyping = false;
-        console.log(`Added error message to session ${session.sessionId}`);
+        updatedSession.isDisplayStopped = false;
+        updatedSession.isCancelling = false;
+        debugLog(`Added error message to session ${session.sessionId}`);
         break;
       
       case 'additional_data':
@@ -1197,21 +1310,43 @@ const WebSocketChat = () => {
         )}
         
         {/* Show the streaming message */}
-        {session.isTyping && session.currentStreamedMessage && (
+        {session.isTyping && session.currentStreamedMessage && !session.isDisplayStopped && !session.isCancelled && (
           <Box sx={{ 
             p: 1, 
             mb: 1,
             alignSelf: 'flex-start',
             maxWidth: '80%',
             backgroundColor: 'grey.100',
-            borderRadius: 2
+            borderRadius: 2,
+            opacity: session.isCancelling ? 0.7 : 1,
+            position: 'relative'
           }}>
+            {session.isCancelling && (
+              <Box sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.1)',
+                borderRadius: 2,
+                zIndex: 2
+              }}>
+                <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                  Cancelling...
+                </Typography>
+              </Box>
+            )}
             {renderMessageContent(session.currentStreamedMessage)}
           </Box>
         )}
         
         {/* Show typing indicator */}
-        {session.isTyping && !session.currentStreamedMessage && !session.isProcessingToolCalls && (
+        {session.isTyping && !session.currentStreamedMessage && !session.isProcessingToolCalls && 
+         !session.isDisplayStopped && !session.isCancelled && (
           <Box sx={{ 
             p: 1, 
             mb: 1,
@@ -1276,11 +1411,16 @@ const WebSocketChat = () => {
       const updatedSessions = [...prevSessions];
       const updatedSession = {
         ...updatedSessions[activeSessionIndex],
+        // Reset cancellation flags when sending a new message
+        isDisplayStopped: false,
+        isCancelled: false,
         messages: [
           ...(updatedSessions[activeSessionIndex].messages || []),
           { role: 'user', content: inputMessage }
         ]
       };
+      
+      debugLog("Reset cancellation flags when sending new message");
       updatedSessions[activeSessionIndex] = updatedSession;
       return updatedSessions;
     });
@@ -1331,6 +1471,24 @@ const WebSocketChat = () => {
       
       // Only update processing/stream states if there's no active conversation
       const session = sessions[newValue];
+      
+      // Reset cancellation flags when switching to a session
+      if (session.isCancelled || session.isDisplayStopped) {
+        debugLog(`Resetting cancellation flags when switching to session ${newSessionId}`);
+        setSessions(prevSessions => {
+          return prevSessions.map((s, idx) => {
+            if (idx === newValue) {
+              return {
+                ...s,
+                isDisplayStopped: false,
+                isCancelled: false,
+              };
+            }
+            return s;
+          });
+        });
+      }
+      
       if (!session.isTyping) {
         // If this session is not currently receiving messages, it's safe to update
         lastSessionIdRef.current['next_message'] = newSessionId;
@@ -1456,14 +1614,18 @@ const WebSocketChat = () => {
           timestamp: msg.created_at
         }));
         
-        // Create a session object
+        // Create a session object with cancellation flags reset
         const session = {
           sessionId: sessionData.session_id,
           threadId: sessionData.thread_id,
           name: `Chat ${sessions.length + 1}`,
           messages: formattedMessages,
-          isLoaded: true
+          isLoaded: true,
+          isDisplayStopped: false,
+          isCancelled: false
         };
+        
+        debugLog("Created new session with cancellation flags reset");
         
         // Add the session and make it active
         setSessions(prevSessions => {
@@ -1488,6 +1650,86 @@ const WebSocketChat = () => {
       action: 'continue_session',
       session_id: sessionId
     }));
+  };
+
+  // Cancel the current response generation
+  const cancelResponse = () => {
+    if (!activeSession) {
+      debugLog('No active session to cancel');
+      return;
+    }
+
+    debugLog('Cancel response requested at: ' + new Date().toISOString());
+    setIsCancelling(true);
+    
+    // Set a flag to stop displaying more content on this session
+    setSessions(prevSessions => {
+      return prevSessions.map(session => {
+        if (session.isTyping) {
+          debugLog(`Stopping display for session ${session.sessionId}`);
+          return {
+            ...session,
+            isDisplayStopped: true,
+            isCancelling: true
+          };
+        }
+        return session;
+      });
+    });
+    
+    // Wait a moment to show the cancelling state, then finalize
+    setTimeout(() => {
+      debugLog('Finalizing cancellation');
+      
+      // Update session state to stop typing and add cancellation message
+      setSessions(prevSessions => {
+        return prevSessions.map(session => {
+          if (session.isTyping || session.isCancelling) {
+            const messages = [...session.messages];
+            
+            // If there's a partial response, include it
+            if (session.currentStreamedMessage && session.currentStreamedMessage.trim()) {
+              debugLog(`Adding partial response with [cancelled] suffix`);
+              messages.push({ 
+                role: 'assistant', 
+                content: session.currentStreamedMessage + ' [cancelled]',
+                isCancelled: true
+              });
+            }
+            
+            // Add the cancellation message
+            messages.push({ 
+              role: 'system', 
+              content: 'Response generation cancelled by user.',
+              isCancelled: true
+            });
+            
+            return {
+              ...session,
+              isTyping: false,
+              isCancelling: false,
+              isDisplayStopped: true, // Keep this true to prevent restarting
+              currentStreamedMessage: '',
+              messageBuffer: '',
+              isCancelled: true, // Add a permanent flag to indicate this session was cancelled
+              messages
+            };
+          }
+          return session;
+        });
+      });
+      
+      setIsCancelling(false);
+      setCurrentRunInfo(null);
+      
+      // Also attempt to cancel on server (not critical but good practice)
+      if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN) {
+        debugLog('Sending cancel_run action to server');
+        webSocketRef.current.send(JSON.stringify({
+          action: 'cancel_run'
+        }));
+      }
+    }, 500);
   };
 
   // Add sidebar rendering for chat history
@@ -1686,20 +1928,38 @@ const WebSocketChat = () => {
         <div ref={messagesEndRef} />
       </Paper>
       
-      {/* Input area */}
+      {/* Input area with stop button */}
       <Box sx={{ display: 'flex', alignItems: 'center' }}>
         <TextField
           fullWidth
           variant="outlined"
-          placeholder="Type your message..."
+            placeholder={isResponseStreaming ? "Wait for response to complete..." : "Type your message..."}
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={handleKeyPress}
-          disabled={!connected || !activeSession?.sessionId}
+            disabled={!connected || !activeSession?.sessionId || (isResponseStreaming && !activeSession?.isCancelled)}
           multiline
           maxRows={4}
-          sx={{ mr: 1 }}
+            sx={{ 
+              mr: 1,
+              "& .MuiInputBase-input.Mui-disabled": {
+                WebkitTextFillColor: "#666666",
+              }
+            }}
         />
+        
+        {isResponseStreaming && !activeSession?.isCancelled ? (
+          <Button 
+            variant="contained" 
+            color="error"
+            startIcon={<StopIcon />}
+            onClick={cancelResponse}
+            disabled={!connected || isCancelling}
+            sx={{ minWidth: '100px' }}
+          >
+            {isCancelling ? 'Stopping...' : 'Stop'}
+          </Button>
+        ) : (
         <Button 
           variant="contained" 
           color="primary"
@@ -1709,6 +1969,7 @@ const WebSocketChat = () => {
         >
           Send
         </Button>
+        )}
       </Box>
       
       {!connected && (
