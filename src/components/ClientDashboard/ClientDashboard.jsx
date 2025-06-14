@@ -95,15 +95,34 @@ const ClientDashboard = () => {
     
     try {
       const response = await axios.get('/api/client-analytics/accessible-campaigns');
-      setCampaigns(response.data.data.campaigns || []);
+      
+      // Debug logging to understand the response structure
+      console.log('Full response:', response);
+      console.log('Response data:', response.data);
+      console.log('Response data.data:', response.data?.data);
+      
+      // Handle different possible response structures
+      let campaigns = [];
+      if (response.data?.data?.campaigns) {
+        campaigns = response.data.data.campaigns;
+      } else if (response.data?.campaigns) {
+        campaigns = response.data.campaigns;
+      } else if (Array.isArray(response.data)) {
+        campaigns = response.data;
+      } else {
+        console.error('Unexpected response structure:', response.data);
+        throw new Error('Invalid response structure from server');
+      }
+      
+      setCampaigns(campaigns || []);
       
       // Set first customer and campaign as selected if available
-      if (response.data.data.campaigns && response.data.data.campaigns.length > 0) {
-        const firstCustomerId = response.data.data.campaigns[0].customer_id;
+      if (campaigns && campaigns.length > 0) {
+        const firstCustomerId = campaigns[0].customer_id;
         setSelectedCustomerId(firstCustomerId);
         
         // Find campaigns for this customer
-        const customerCampaigns = response.data.data.campaigns.filter(
+        const customerCampaigns = campaigns.filter(
           c => c.customer_id === firstCustomerId
         );
         
@@ -114,7 +133,27 @@ const ClientDashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching campaigns:', err);
-      setError('Failed to load your campaigns. Please try again later.');
+      console.error('Error response:', err.response);
+      console.error('Error response data:', err.response?.data);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load your campaigns. Please try again later.';
+      
+      if (err.response) {
+        if (err.response.status === 401) {
+          errorMessage = 'Authentication failed. Please log in again.';
+        } else if (err.response.status === 403) {
+          errorMessage = 'You do not have permission to access campaigns.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'Server error. Please try again later.';
+        } else if (err.response.data?.detail) {
+          errorMessage = err.response.data.detail;
+        }
+      } else if (err.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to server. Please check your connection.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
