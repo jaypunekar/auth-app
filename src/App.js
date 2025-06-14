@@ -9,6 +9,8 @@ import FeedbackReview from './components/Chat/FeedbackReview';
 import SEOAnalysisPage from './pages/SEOAnalysisPage';
 import ComprehensiveAnalysis from './components/SEOAnalysis/ComprehensiveAnalysis';
 import ContactPage from './pages/ContactPage';
+import ClientLogin from './components/ClientLogin/ClientLogin';
+import ClientDashboard from './components/ClientDashboard/ClientDashboard';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -37,6 +39,7 @@ import ContentCalendarPage from './pages/ContentCalendarPage';
 import ContentCalendarView from './components/ContentCalendarView';
 import CampaignSharePage from './pages/CampaignSharePage';
 import CampaignSpendingPage from './pages/CampaignSpendingPage';
+import ClientManagementPage from './pages/ClientManagementPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -48,6 +51,18 @@ const ProtectedRoute = ({ children }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
+  }
+
+  return children;
+};
+
+// Client Protected Route Component
+const ClientProtectedRoute = ({ children }) => {
+  // Check if client token exists in localStorage
+  const clientToken = localStorage.getItem('clientToken');
+
+  if (!clientToken) {
+    return <Navigate to="/client-login" />;
   }
 
   return children;
@@ -75,6 +90,14 @@ function App() {
         {/* Public Routes */}
         <Route path="campaign/share/:shareId" element={<CampaignSharePage />} />
         <Route path="contact" element={<ContactPage />} />
+        
+        {/* Client Routes */}
+        <Route path="client-login" element={<ClientLogin />} />
+        <Route path="client-dashboard" element={
+          <ClientProtectedRoute>
+            <ClientDashboard />
+          </ClientProtectedRoute>
+        } />
 
         {/* Protected Routes */}
         <Route path="/" element={
@@ -104,6 +127,7 @@ function App() {
           <Route path="seo-analysis" element={<SEOAnalysisPage />} />
           <Route path="comprehensive-analysis" element={<ComprehensiveAnalysis />} />
           <Route path="campaign-share" element={<CampaignSharePage />} />
+          <Route path="client-management" element={<ClientManagementPage />} />
         </Route>
 
         {/* Redirect to login for any other route */}

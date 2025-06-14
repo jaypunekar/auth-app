@@ -369,7 +369,7 @@ const ImageGenerator = () => {
               You don't have enough credits to generate an image. Each image generation costs 2 credits.
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Upgrade to a Pro subscription to receive 250 credits or continue with your free account with 20 credits.
+              Upgrade to a Pro subscription to receive 250 credits or continue with your free account with 50 credits.
             </Typography>
           </DialogContent>
           <DialogActions>

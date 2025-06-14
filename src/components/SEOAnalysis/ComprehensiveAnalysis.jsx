@@ -12,10 +12,6 @@ import {
   Tabs,
   Tab,
   Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   List,
   ListItem,
   ListItemText,
@@ -26,7 +22,6 @@ import {
 import {
   Language,
   Search,
-  Save as SaveIcon,
   Delete as DeleteIcon,
   Visibility as ViewIcon,
   History as HistoryIcon,
@@ -43,8 +38,6 @@ const ComprehensiveAnalysis = () => {
   const [error, setError] = useState(null);
   const [savedError, setSavedError] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
-  const [analysisName, setAnalysisName] = useState('');
   const [savedAnalyses, setSavedAnalyses] = useState([]);
   const [viewingSavedAnalysis, setViewingSavedAnalysis] = useState(false);
 
@@ -57,9 +50,9 @@ const ComprehensiveAnalysis = () => {
     setLoadingSaved(true);
     setSavedError(null);
     try {
-      const response = await axios.get('/api/seo/saved-analyses');
+      const response = await axios.get('/api/seo/comprehensive-analyses');
       // Add debugging
-      console.log('Saved analyses response:', response);
+      console.log('Comprehensive analyses response:', response);
       
       // Ensure we have an array
       if (Array.isArray(response.data)) {
@@ -67,15 +60,15 @@ const ComprehensiveAnalysis = () => {
       } else {
         console.error('Expected array but got:', response.data);
         setSavedAnalyses([]);
-        setSavedError('Failed to load saved analyses: Invalid response format');
+        setSavedError('Failed to load comprehensive analyses: Invalid response format');
       }
     } catch (err) {
-      console.error('Error fetching saved analyses:', err);
+      console.error('Error fetching comprehensive analyses:', err);
       setSavedAnalyses([]); // Ensure savedAnalyses is always an array
       setSavedError(
         err.response?.data?.detail || 
         err.response?.data?.message || 
-        'Failed to load saved analyses. Please try refreshing the page.'
+        'Failed to load comprehensive analyses. Please try refreshing the page.'
       );
     } finally {
       setLoadingSaved(false);
@@ -100,25 +93,8 @@ const ComprehensiveAnalysis = () => {
     setLoading(false);
   };
 
-  const handleSave = async () => {
-    if (!results) return;
-
-    try {
-      await axios.post('/api/seo/save-analysis', {
-        url: results.url,
-        analysis_data: results.data,
-        name: analysisName || `Analysis of ${results.url}`,
-      });
-      setSaveDialogOpen(false);
-      setAnalysisName('');
-      await fetchSavedAnalyses();
-    } catch (err) {
-      setError('Failed to save analysis: ' + (err.response?.data?.detail || err.message));
-    }
-  };
-
   const handleDelete = async (analysisId) => {
-    if (!window.confirm('Are you sure you want to delete this analysis?')) return;
+    if (!window.confirm('Are you sure you want to delete this comprehensive analysis?')) return;
 
     try {
       await axios.delete(`/api/seo/saved-analysis/${analysisId}`);
@@ -130,7 +106,7 @@ const ComprehensiveAnalysis = () => {
 
   const handleView = async (analysisId) => {
     try {
-      const response = await axios.get(`/api/seo/saved-analysis/${analysisId}`);
+      const response = await axios.get(`/api/seo/comprehensive-analysis/${analysisId}`);
       setResults({
         url: response.data.url,
         name: response.data.name,
@@ -161,7 +137,7 @@ const ComprehensiveAnalysis = () => {
     <Paper sx={{ mt: 4, p: 2 }}>
       <Typography variant="h6" gutterBottom>
         <HistoryIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-        Saved Analyses
+        Comprehensive Analysis History
       </Typography>
       
       {savedError && (
@@ -207,8 +183,8 @@ const ComprehensiveAnalysis = () => {
           {savedAnalyses.length === 0 && (
             <ListItem>
               <ListItemText
-                primary="No saved analyses"
-                secondary="Run an analysis and save it to see it here"
+                primary="No comprehensive analyses yet"
+                secondary="Run a comprehensive analysis to see it here"
               />
             </ListItem>
           )}
@@ -240,15 +216,12 @@ const ComprehensiveAnalysis = () => {
                       Generated at: {new Date(results.timestamp).toLocaleString()}
                     </Typography>
                   )}
+                  {results.saved_analysis_id && (
+                    <Typography variant="caption" display="block" color="success.main">
+                      ✓ Analysis automatically saved to your history
+                    </Typography>
+                  )}
                 </div>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<SaveIcon />}
-                  onClick={() => setSaveDialogOpen(true)}
-                >
-                  Save Analysis
-                </Button>
               </Box>
               <Box sx={{ maxHeight: '600px', overflow: 'auto' }}>
                 <SEOResults data={data} type={selectedTab} />
@@ -317,29 +290,6 @@ const ComprehensiveAnalysis = () => {
 
       {/* Always render saved analyses section */}
       {renderSavedAnalyses()}
-
-      {/* Save Analysis Dialog */}
-      <Dialog open={saveDialogOpen} onClose={() => setSaveDialogOpen(false)}>
-        <DialogTitle>Save Analysis</DialogTitle>
-        <DialogContent>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Analysis Name"
-            fullWidth
-            variant="outlined"
-            value={analysisName}
-            onChange={(e) => setAnalysisName(e.target.value)}
-            placeholder={`Analysis of ${results?.url || ''}`}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSaveDialogOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave} variant="contained" color="primary">
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
