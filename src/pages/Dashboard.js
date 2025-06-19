@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -10,7 +10,6 @@ import {
   Button,
   Grid,
   Chip,
-  Divider,
   CircularProgress,
   Alert,
   Tabs,
@@ -43,7 +42,6 @@ import {
   ThumbDown as ThumbDownIcon,
   Chat as ChatIcon,
   Star as StarIcon,
-  LockOutlined as LockIcon,
 } from '@mui/icons-material';
 import { adCampaignAPI, googleAdsAPI, feedbackAPI } from '../services/api';
 import AuthDebug from '../components/AuthDebug';
@@ -314,22 +312,6 @@ const Dashboard = () => {
     fetchFeedbackData();
     fetchCampaignPerformance();
   }, [activeTab]);
-
-  const handleGenerateImage = async (campaignId) => {
-    try {
-      const response = await adCampaignAPI.generateImage(campaignId);
-      
-      // Update the campaign in the state
-      setCampaigns((prevCampaigns) =>
-        prevCampaigns.map((campaign) =>
-          campaign.id === campaignId ? response.data : campaign
-        )
-      );
-    } catch (err) {
-      setError('Failed to generate image. Please try again.');
-      console.error(err);
-    }
-  };
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -938,7 +920,6 @@ const Dashboard = () => {
     
     // Calculate averages
     const avgCTR = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
-    const avgCPC = totals.clicks > 0 ? totals.cost / totals.clicks : 0;
     
     return (
       <Box sx={{ mt: 2 }}>
@@ -1002,7 +983,6 @@ const Dashboard = () => {
   }
 
   const groupedCampaigns = groupCampaignsByPlatform(campaigns);
-  const platforms = Object.keys(groupedCampaigns);
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -1217,7 +1197,7 @@ const Dashboard = () => {
           // Your existing campaign list UI
           <Box>
             {/* Group campaigns by platform */}
-            {Object.entries(groupCampaignsByPlatform(campaigns)).map(([platform, platformCampaigns]) => (
+            {Object.entries(groupedCampaigns).map(([platform, platformCampaigns]) => (
               <Box key={platform} sx={{ mb: 4 }}>
                 <Typography variant="h6" gutterBottom>
                   {platform} Campaigns
@@ -1712,216 +1692,50 @@ const Dashboard = () => {
               <TextField
                 key={index}
                 label={`Headline ${index + 1}`}
-                value={headline.text || ''}
-                onChange={(e) => {
-                  const newHeadlines = [...updatedAdData.headlines];
-                  newHeadlines[index] = { ...headline, text: e.target.value };
-                  setUpdatedAdData({
-                    ...updatedAdData,
-                    headlines: newHeadlines
-                  });
-                }}
                 fullWidth
                 margin="normal"
-                helperText={headline.pinnedField ? `Pinned to ${headline.pinnedField}` : `${headline.text ? headline.text.length : 0}/30 characters`}
-                error={headline.text && headline.text.length > 30}
-                InputProps={{
-                  endAdornment: (
-                    <Typography variant="caption" color={headline.text && headline.text.length > 30 ? "error" : "text.secondary"}>
-                      {headline.text ? headline.text.length : 0}/30
-                    </Typography>
-                  )
-                }}
+                value={headline.text}
+                onChange={(e) => handleUpdateAdField('headline', e.target.value, index)}
               />
             ))}
             
-            {updatedAdData.headlines.length < 15 && (
-              <Button 
-                variant="outlined" 
-                size="small" 
-                sx={{ mt: 1, mb: 3 }}
-                onClick={() => {
-                  const newHeadlines = [...updatedAdData.headlines, { text: '', pinnedField: null }];
-                  setUpdatedAdData({
-                    ...updatedAdData,
-                    headlines: newHeadlines
-                  });
-                }}
-              >
-                + Add Another Headline
-              </Button>
-            )}
-            
-            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Descriptions</Typography>
+            <Typography variant="h6" gutterBottom>Descriptions</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Add 2-4 descriptions (min 2, max 4). Each description can be up to 90 characters.
+              Add 2-10 descriptions (min 2, max 10). Each description can be up to 30 characters.
             </Typography>
             {updatedAdData.descriptions.map((description, index) => (
               <TextField
                 key={index}
                 label={`Description ${index + 1}`}
-                value={description.text || ''}
-                onChange={(e) => {
-                  const newDescriptions = [...updatedAdData.descriptions];
-                  newDescriptions[index] = { ...description, text: e.target.value };
-                  setUpdatedAdData({
-                    ...updatedAdData,
-                    descriptions: newDescriptions
-                  });
-                }}
                 fullWidth
                 margin="normal"
-                multiline
-                rows={2}
-                helperText={description.pinnedField ? `Pinned to ${description.pinnedField}` : `${description.text ? description.text.length : 0}/90 characters`}
-                error={description.text && description.text.length > 90}
-                InputProps={{
-                  endAdornment: (
-                    <Typography variant="caption" color={description.text && description.text.length > 90 ? "error" : "text.secondary"}>
-                      {description.text ? description.text.length : 0}/90
-                    </Typography>
-                  )
-                }}
+                value={description.text}
+                onChange={(e) => handleUpdateAdField('description', e.target.value, index)}
               />
             ))}
             
-            {updatedAdData.descriptions.length < 4 && (
-              <Button 
-                variant="outlined" 
-                size="small" 
-                sx={{ mt: 1, mb: 3 }}
-                onClick={() => {
-                  const newDescriptions = [...updatedAdData.descriptions, { text: '', pinnedField: null }];
-                  setUpdatedAdData({
-                    ...updatedAdData,
-                    descriptions: newDescriptions
-                  });
-                }}
-              >
-                + Add Another Description
-              </Button>
-            )}
-            
-            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>Final URL</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              This is the landing page users will go to when they click your ad.
-            </Typography>
             <TextField
               label="Final URL"
-              value={updatedAdData.finalUrl || ''}
-              onChange={(e) => {
-                setUpdatedAdData({
-                  ...updatedAdData,
-                  finalUrl: e.target.value
-                });
-              }}
               fullWidth
               margin="normal"
-              placeholder="https://www.example.com"
-              helperText="Make sure your URL includes http:// or https://"
+              value={updatedAdData.finalUrl}
+              onChange={(e) => handleUpdateAdField('finalUrl', e.target.value)}
             />
-            
-            <Box sx={{ mt: 3, mb: 2, p: 2, bgcolor: 'rgba(0, 0, 0, 0.04)', borderRadius: 1 }}>
-              <Typography variant="h6" gutterBottom>Ad Preview</Typography>
-              
-              <Box sx={{ 
-                mb: 2, 
-                p: 2, 
-                border: '1px solid #ddd', 
-                borderRadius: 1, 
-                backgroundColor: '#fff',
-                maxWidth: '600px'
-              }}>
-                {/* URL in green */}
-                <Typography variant="body2" sx={{ color: '#1a0dab', fontSize: '16px', fontWeight: 'bold' }}>
-                  {updatedAdData.headlines[0]?.text || '[Headline 1]'}
-                </Typography>
-                
-                {/* Display URL in green */}
-                <Typography variant="body2" sx={{ color: '#006621', fontSize: '14px' }}>
-                  {updatedAdData.finalUrl ? updatedAdData.finalUrl.replace(/^https?:\/\//i, '') : 'www.example.com'}
-                </Typography>
-                
-                {/* Ad copy */}
-                <Typography variant="body2" sx={{ color: '#545454', fontSize: '14px', mt: 0.5 }}>
-                  {updatedAdData.descriptions[0]?.text || '[Description 1]'}
-                </Typography>
-                
-                {/* Additional headlines */}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', mt: 1, gap: 1 }}>
-                  {updatedAdData.headlines.slice(1, 4).map((headline, index) => (
-                    headline.text ? (
-                      <Typography key={index} variant="body2" sx={{ 
-                        color: '#1a0dab',
-                        fontSize: '14px',
-                        '&:not(:last-child)::after': {
-                          content: '"|"',
-                          color: '#70757a',
-                          marginLeft: '4px',
-                          marginRight: '4px'
-                        }
-                      }}>
-                        {headline.text}
-                      </Typography>
-                    ) : null
-                  ))}
-                </Box>
-              </Box>
-              
-              <Typography variant="caption" color="text.secondary">
-                This is a simplified preview. Google Ads will automatically test different combinations of your headlines and descriptions.
-              </Typography>
-            </Box>
           </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleUpdateAdDialogClose}>Cancel</Button>
           <Button 
             onClick={handleSubmitAdUpdate} 
-            variant="contained"
-            disabled={
-              updatedAdData.headlines.filter(h => h.text && h.text.trim()).length < 3 || 
-              updatedAdData.descriptions.filter(d => d.text && d.text.trim()).length < 2 ||
-              !updatedAdData.finalUrl ||
-              updatedAdData.headlines.some(h => h.text && h.text.length > 30) ||
-              updatedAdData.descriptions.some(d => d.text && d.text.length > 90) ||
-              updatingAd
-            }
-            startIcon={updatingAd && <CircularProgress size={20} />}
+            variant="contained" 
+            color="primary"
           >
-            {updatingAd ? 'Updating...' : 'Update Ad'}
+            Update
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog}>
-        <DialogTitle>Delete Campaign</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete the campaign "{campaignToDelete?.name}"? 
-            This action cannot be undone.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteDialog} disabled={deletingCampaign}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleDeleteCampaign} 
-            color="error" 
-            disabled={deletingCampaign}
-            startIcon={deletingCampaign ? <CircularProgress size={20} /> : <DeleteIcon />}
-          >
-            {deletingCampaign ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Add the AuthDebug component */}
-      <AuthDebug />
     </Container>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

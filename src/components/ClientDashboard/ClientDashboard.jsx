@@ -18,7 +18,13 @@ import {
   ListItemText,
   ListItemSecondaryAction,
   IconButton,
-  Tooltip
+  Tooltip,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Snackbar
 } from '@mui/material';
 import {
   BarChart,
@@ -39,7 +45,9 @@ import {
   Visibility as ViewIcon,
   Person as PersonIcon,
   Business as BusinessIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  ThumbUp as ThumbUpIcon,
+  ThumbDown as ThumbDownIcon
 } from '@mui/icons-material';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -52,8 +60,17 @@ const ClientDashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [approvalDialogOpen, setApprovalDialogOpen] = useState(false);
+  const [approvalAction, setApprovalAction] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [campaignTab, setCampaignTab] = useState(0);
   const navigate = useNavigate();
 
   // Colors for charts
@@ -95,65 +112,30 @@ const ClientDashboard = () => {
     
     try {
       const response = await axios.get('/api/client-analytics/accessible-campaigns');
-      
-      // Debug logging to understand the response structure
-      console.log('Full response:', response);
-      console.log('Response data:', response.data);
-      console.log('Response data.data:', response.data?.data);
-      
-      // Handle different possible response structures
-      let campaigns = [];
-      if (response.data?.data?.campaigns) {
-        campaigns = response.data.data.campaigns;
-      } else if (response.data?.campaigns) {
-        campaigns = response.data.campaigns;
-      } else if (Array.isArray(response.data)) {
-        campaigns = response.data;
-      } else {
-        console.error('Unexpected response structure:', response.data);
-        throw new Error('Invalid response structure from server');
-      }
-      
-      setCampaigns(campaigns || []);
+      setCampaigns(response.data.data.campaigns || []);
       
       // Set first customer and campaign as selected if available
-      if (campaigns && campaigns.length > 0) {
-        const firstCustomerId = campaigns[0].customer_id;
+      if (response.data.data.campaigns && response.data.data.campaigns.length > 0) {
+        const firstCustomerId = response.data.data.campaigns[0].customer_id;
         setSelectedCustomerId(firstCustomerId);
         
         // Find campaigns for this customer
-        const customerCampaigns = campaigns.filter(
+        const customerCampaigns = response.data.data.campaigns.filter(
           c => c.customer_id === firstCustomerId
         );
         
         if (customerCampaigns.length > 0) {
           setSelectedCampaignId(customerCampaigns[0].id);
-          fetchCampaignAnalytics(firstCustomerId, customerCampaigns[0].id);
+          const campaign = customerCampaigns[0];
+          setSelectedCampaign(campaign);
+          if (campaign.source !== 'shared') {
+            fetchCampaignAnalytics(firstCustomerId, customerCampaigns[0].id);
+          }
         }
       }
     } catch (err) {
       console.error('Error fetching campaigns:', err);
-      console.error('Error response:', err.response);
-      console.error('Error response data:', err.response?.data);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to load your campaigns. Please try again later.';
-      
-      if (err.response) {
-        if (err.response.status === 401) {
-          errorMessage = 'Authentication failed. Please log in again.';
-        } else if (err.response.status === 403) {
-          errorMessage = 'You do not have permission to access campaigns.';
-        } else if (err.response.status === 500) {
-          errorMessage = 'Server error. Please try again later.';
-        } else if (err.response.data?.detail) {
-          errorMessage = err.response.data.detail;
-        }
-      } else if (err.code === 'ECONNREFUSED') {
-        errorMessage = 'Cannot connect to server. Please check your connection.';
-      }
-      
-      setError(errorMessage);
+      setError('Failed to load your campaigns. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -201,32 +183,44 @@ const ClientDashboard = () => {
     
     if (newValue === 0 && selectedCustomerId) {
       // Overview tab - fetch combined analytics
-      fetchCombinedAnalytics(selectedCustomerId);
+      const anyGoogleCampaign = campaigns.find(c => c.customer_id === selectedCustomerId && c.source !== 'shared');
+      if (anyGoogleCampaign) {
+        fetchCombinedAnalytics(selectedCustomerId);
+      }
     } else if (newValue === 1 && selectedCustomerId && selectedCampaignId) {
       // Campaign details tab - fetch specific campaign analytics
-      fetchCampaignAnalytics(selectedCustomerId, selectedCampaignId);
+      if (selectedCampaign && selectedCampaign.source !== 'shared') {
+        fetchCampaignAnalytics(selectedCustomerId, selectedCampaignId);
+      }
     }
   };
   
   const handleCampaignSelect = (customerId, campaignId) => {
     setSelectedCustomerId(customerId);
     setSelectedCampaignId(campaignId);
-    
-    // Fetch analytics for the selected campaign
-    fetchCampaignAnalytics(customerId, campaignId);
-    
-    // Switch to campaign details tab
+    // Find the selected campaign object
+    const campaign = campaigns.find(c => c.customer_id === customerId && c.id === campaignId);
+    setSelectedCampaign(campaign);
+    // Only fetch analytics for Google Ads campaigns
+    if (campaign && campaign.source !== 'shared') {
+      fetchCampaignAnalytics(customerId, campaignId);
+    } else {
+      setAnalyticsData(null);
+    }
     setActiveTab(1);
   };
   
   const handleCustomerSelect = (customerId) => {
     setSelectedCustomerId(customerId);
     setSelectedCampaignId(null);
-    
-    // Fetch combined analytics for this customer
-    fetchCombinedAnalytics(customerId);
-    
-    // Switch to overview tab
+    setSelectedCampaign(null);
+    // Only fetch analytics for Google Ads customers
+    const anyGoogleCampaign = campaigns.find(c => c.customer_id === customerId && c.source !== 'shared');
+    if (anyGoogleCampaign) {
+      fetchCombinedAnalytics(customerId);
+    } else {
+      setAnalyticsData(null);
+    }
     setActiveTab(0);
   };
   
@@ -234,6 +228,61 @@ const ClientDashboard = () => {
     localStorage.removeItem('clientToken');
     localStorage.removeItem('clientInfo');
     navigate('/client-login');
+  };
+
+  const handleApprovalAction = (action) => {
+    setApprovalAction(action);
+    setApprovalDialogOpen(true);
+  };
+
+  const handleSubmitApproval = async () => {
+    if (!selectedCampaign) return;
+    
+    setSubmittingApproval(true);
+    try {
+      const response = await axios.post(`/api/client-analytics/shared-campaigns/${selectedCampaign.id}/approve`, {
+        status: approvalAction,
+        feedback: feedback
+      });
+      
+      if (response.data.success) {
+        setSnackbarMessage(`Campaign ${approvalAction} successfully!`);
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
+        
+        // Update the campaign in the list
+        const updatedCampaigns = campaigns.map(c => 
+          c.id === selectedCampaign.id 
+            ? { ...c, approval_status: approvalAction }
+            : c
+        );
+        setCampaigns(updatedCampaigns);
+        
+        // Update selected campaign
+        setSelectedCampaign({ ...selectedCampaign, approval_status: approvalAction });
+        
+        setApprovalDialogOpen(false);
+        setFeedback('');
+        setApprovalAction('');
+      }
+    } catch (err) {
+      console.error('Error submitting approval:', err);
+      setSnackbarMessage('Failed to submit approval. Please try again.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+    } finally {
+      setSubmittingApproval(false);
+    }
+  };
+
+  const handleCloseApprovalDialog = () => {
+    setApprovalDialogOpen(false);
+    setFeedback('');
+    setApprovalAction('');
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
   
   // Group campaigns by customer
@@ -272,7 +321,14 @@ const ClientDashboard = () => {
   };
   
   const pieData = preparePieData(analyticsData);
-  
+
+  // Helper: filter campaigns that need review (pending and previously disapproved)
+  const needsReviewCampaigns = campaigns.filter(c => {
+    if (c.approval_status !== 'pending') return false;
+    if (!c.approvals) return false;
+    return c.approvals.some(a => a.status === 'disapproved');
+  });
+
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Header with client info */}
@@ -326,52 +382,81 @@ const ClientDashboard = () => {
           {/* Campaign List */}
           <Grid item xs={12} md={4}>
             <Paper elevation={2} sx={{ p: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Your Campaigns
-              </Typography>
-              
-              {Object.entries(customerCampaigns).length === 0 ? (
-                <Alert severity="info">
-                  No campaigns available. Please contact your account manager.
-                </Alert>
+              <Tabs value={campaignTab} onChange={(_, v) => setCampaignTab(v)} sx={{ mb: 2 }}>
+                <Tab label="All Campaigns" />
+                <Tab label="Needs Your Review" />
+              </Tabs>
+              {campaignTab === 0 ? (
+                Object.entries(customerCampaigns).length === 0 ? (
+                  <Alert severity="info">
+                    No campaigns available. Please contact your account manager.
+                  </Alert>
+                ) : (
+                  Object.entries(customerCampaigns).map(([customerId, campaigns]) => (
+                    <Box key={customerId} sx={{ mb: 3 }}>
+                      <Button
+                        fullWidth
+                        variant={selectedCustomerId === customerId && !selectedCampaignId ? "contained" : "outlined"}
+                        color="primary"
+                        onClick={() => handleCustomerSelect(customerId)}
+                        sx={{ mb: 1 }}
+                      >
+                        Account: {customerId.substring(0, 6)}... (All Campaigns)
+                      </Button>
+                      <List dense>
+                        {campaigns.map(campaign => (
+                          <ListItem
+                            key={campaign.id}
+                            button
+                            selected={selectedCampaignId === campaign.id}
+                            onClick={() => handleCampaignSelect(customerId, campaign.id)}
+                          >
+                            <ListItemText
+                              primary={campaign.source === 'shared' ? campaign.title : (campaign.name || campaign.title)}
+                              secondary={campaign.source === 'shared' ? `Shared Campaign` : `Status: ${campaign.status || 'Unknown'}`}
+                            />
+                            <ListItemSecondaryAction>
+                              <Tooltip title="View Details">
+                                <IconButton edge="end" onClick={() => handleCampaignSelect(customerId, campaign.id)}>
+                                  <ViewIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </ListItemSecondaryAction>
+                          </ListItem>
+                        ))}
+                      </List>
+                      <Divider sx={{ mt: 1 }} />
+                    </Box>
+                  ))
+                )
               ) : (
-                Object.entries(customerCampaigns).map(([customerId, campaigns]) => (
-                  <Box key={customerId} sx={{ mb: 3 }}>
-                    <Button
-                      fullWidth
-                      variant={selectedCustomerId === customerId && !selectedCampaignId ? "contained" : "outlined"}
-                      color="primary"
-                      onClick={() => handleCustomerSelect(customerId)}
-                      sx={{ mb: 1 }}
-                    >
-                      Account: {customerId.substring(0, 6)}... (All Campaigns)
-                    </Button>
-                    
-                    <List dense>
-                      {campaigns.map(campaign => (
-                        <ListItem
-                          key={campaign.id}
-                          button
-                          selected={selectedCampaignId === campaign.id}
-                          onClick={() => handleCampaignSelect(customerId, campaign.id)}
-                        >
-                          <ListItemText
-                            primary={campaign.name}
-                            secondary={`Status: ${campaign.status || 'Unknown'}`}
-                          />
-                          <ListItemSecondaryAction>
-                            <Tooltip title="View Details">
-                              <IconButton edge="end" onClick={() => handleCampaignSelect(customerId, campaign.id)}>
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </ListItemSecondaryAction>
-                        </ListItem>
-                      ))}
-                    </List>
-                    <Divider sx={{ mt: 1 }} />
-                  </Box>
-                ))
+                // Needs Your Review tab
+                needsReviewCampaigns.length === 0 ? (
+                  <Alert severity="info">No campaigns need your review at this time.</Alert>
+                ) : (
+                  <List dense>
+                    {needsReviewCampaigns.map(campaign => (
+                      <ListItem
+                        key={campaign.id}
+                        button
+                        selected={selectedCampaignId === campaign.id}
+                        onClick={() => handleCampaignSelect(campaign.customer_id, campaign.id)}
+                      >
+                        <ListItemText
+                          primary={campaign.title}
+                          secondary={`Status: Pending Review`}
+                        />
+                        <ListItemSecondaryAction>
+                          <Tooltip title="View Details">
+                            <IconButton edge="end" onClick={() => handleCampaignSelect(campaign.customer_id, campaign.id)}>
+                              <ViewIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                )
               )}
             </Paper>
           </Grid>
@@ -388,87 +473,89 @@ const ClientDashboard = () => {
                 <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
                   <CircularProgress />
                 </Box>
-              ) : !analyticsData ? (
+              ) : !analyticsData && selectedCampaign?.source !== 'shared' ? (
                 <Alert severity="info">
                   Select a campaign or account to view analytics
                 </Alert>
               ) : (
                 <>
                   {/* Summary Cards */}
-                  <Grid container spacing={2} sx={{ mb: 4 }}>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            Impressions
-                          </Typography>
-                          <Typography variant="h5">
-                            {analyticsData.overall_metrics?.total_impressions?.toLocaleString() || 0}
-                          </Typography>
-                        </CardContent>
-                      </Card>
+                  {analyticsData && (
+                    <Grid container spacing={2} sx={{ mb: 4 }}>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              Impressions
+                            </Typography>
+                            <Typography variant="h5">
+                              {analyticsData.overall_metrics?.total_impressions?.toLocaleString() || 0}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              Clicks
+                            </Typography>
+                            <Typography variant="h5">
+                              {analyticsData.overall_metrics?.total_clicks?.toLocaleString() || 0}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              Cost
+                            </Typography>
+                            <Typography variant="h5">
+                              ${analyticsData.overall_metrics?.total_cost?.toFixed(2) || '0.00'}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              CTR
+                            </Typography>
+                            <Typography variant="h5">
+                              {analyticsData.overall_metrics?.average_ctr?.toFixed(2) || '0.00'}%
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              CPC
+                            </Typography>
+                            <Typography variant="h5">
+                              ${analyticsData.overall_metrics?.average_cpc?.toFixed(2) || '0.00'}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={6} sm={4}>
+                        <Card>
+                          <CardContent>
+                            <Typography color="textSecondary" gutterBottom>
+                              Conversions
+                            </Typography>
+                            <Typography variant="h5">
+                              {analyticsData.overall_metrics?.total_conversions?.toLocaleString() || 0}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
                     </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            Clicks
-                          </Typography>
-                          <Typography variant="h5">
-                            {analyticsData.overall_metrics?.total_clicks?.toLocaleString() || 0}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            Cost
-                          </Typography>
-                          <Typography variant="h5">
-                            ${analyticsData.overall_metrics?.total_cost?.toFixed(2) || '0.00'}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            CTR
-                          </Typography>
-                          <Typography variant="h5">
-                            {analyticsData.overall_metrics?.average_ctr?.toFixed(2) || '0.00'}%
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            CPC
-                          </Typography>
-                          <Typography variant="h5">
-                            ${analyticsData.overall_metrics?.average_cpc?.toFixed(2) || '0.00'}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                    <Grid item xs={6} sm={4}>
-                      <Card>
-                        <CardContent>
-                          <Typography color="textSecondary" gutterBottom>
-                            Conversions
-                          </Typography>
-                          <Typography variant="h5">
-                            {analyticsData.overall_metrics?.total_conversions?.toLocaleString() || 0}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  </Grid>
+                  )}
                   
                   {/* Performance Chart */}
                   {chartData.length > 0 && (
@@ -522,31 +609,80 @@ const ClientDashboard = () => {
                   )}
                   
                   {/* Campaign Details (for campaign tab) */}
-                  {activeTab === 1 && selectedCampaignId && (
+                  {activeTab === 1 && selectedCampaignId && selectedCampaign && selectedCampaign.source === 'shared' && (
                     <Box>
                       <Typography variant="h6" gutterBottom>
-                        Campaign Details
+                        Shared Campaign Details
                       </Typography>
-                      
-                      {/* Additional campaign-specific metrics could go here */}
-                      {analyticsData.campaign_details && (
-                        <Grid container spacing={2}>
-                          {Object.entries(analyticsData.campaign_details).map(([key, value]) => (
-                            <Grid item xs={6} sm={4} key={key}>
-                              <Card>
-                                <CardContent>
-                                  <Typography color="textSecondary" gutterBottom>
-                                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
+                          <Card>
+                            <CardContent>
+                              <Typography variant="h5">{selectedCampaign.title}</Typography>
+                              <Typography variant="body1" color="text.secondary" paragraph>
+                                {selectedCampaign.description}
+                              </Typography>
+                              <Divider sx={{ my: 2 }} />
+                              <Typography variant="subtitle1">Platform: {selectedCampaign.platform}</Typography>
+                              <Typography variant="subtitle1">Budget: ${selectedCampaign.budget}</Typography>
+                              <Typography variant="subtitle1">Start Date: {selectedCampaign.start_date}</Typography>
+                              <Typography variant="subtitle1">End Date: {selectedCampaign.end_date}</Typography>
+                              <Typography variant="subtitle1">Objective: {selectedCampaign.objective}</Typography>
+                              <Typography variant="subtitle1">Website: {selectedCampaign.website_url}</Typography>
+                              <Divider sx={{ my: 2 }} />
+                              <Typography variant="subtitle1">Headlines:</Typography>
+                              <List dense>
+                                {selectedCampaign.headlines && selectedCampaign.headlines.map((h, i) => (
+                                  <ListItem key={i}><ListItemText primary={h} /></ListItem>
+                                ))}
+                              </List>
+                              <Typography variant="subtitle1">Descriptions:</Typography>
+                              <List dense>
+                                {selectedCampaign.descriptions && selectedCampaign.descriptions.map((d, i) => (
+                                  <ListItem key={i}><ListItemText primary={d} /></ListItem>
+                                ))}
+                              </List>
+                              <Typography variant="subtitle1">Keywords:</Typography>
+                              <List dense>
+                                {selectedCampaign.keywords && selectedCampaign.keywords.map((k, i) => (
+                                  <ListItem key={i}><ListItemText primary={k} /></ListItem>
+                                ))}
+                              </List>
+                              <Typography variant="subtitle1">Target Audience:</Typography>
+                              <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4 }}>{JSON.stringify(selectedCampaign.target_audience, null, 2)}</pre>
+                              <Divider sx={{ my: 2 }} />
+                              <Typography variant="subtitle1">Approval Status: {selectedCampaign.approval_status || 'Pending'}</Typography>
+                              
+                              {/* Approval Actions */}
+                              {(!selectedCampaign.approval_status || selectedCampaign.approval_status === 'pending') && (
+                                <Box sx={{ mt: 3 }}>
+                                  <Typography variant="h6" gutterBottom>
+                                    Campaign Approval
                                   </Typography>
-                                  <Typography variant="body1">
-                                    {typeof value === 'number' ? value.toLocaleString() : value.toString()}
-                                  </Typography>
-                                </CardContent>
-                              </Card>
-                            </Grid>
-                          ))}
+                                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                    <Button
+                                      variant="contained"
+                                      color="success"
+                                      startIcon={<ThumbUpIcon />}
+                                      onClick={() => handleApprovalAction('approved')}
+                                    >
+                                      Approve Campaign
+                                    </Button>
+                                    <Button
+                                      variant="contained"
+                                      color="error"
+                                      startIcon={<ThumbDownIcon />}
+                                      onClick={() => handleApprovalAction('disapproved')}
+                                    >
+                                      Disapprove Campaign
+                                    </Button>
+                                  </Box>
+                                </Box>
+                              )}
+                            </CardContent>
+                          </Card>
                         </Grid>
-                      )}
+                      </Grid>
                     </Box>
                   )}
                 </>
@@ -555,6 +691,53 @@ const ClientDashboard = () => {
           </Grid>
         </Grid>
       )}
+
+      {/* Approval Dialog */}
+      <Dialog open={approvalDialogOpen} onClose={handleCloseApprovalDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {approvalAction === 'approved' ? 'Approve Campaign' : 'Disapprove Campaign'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" paragraph>
+            Please provide feedback for this campaign:
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            label="Feedback (optional)"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            placeholder="Share your thoughts about this campaign..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseApprovalDialog} disabled={submittingApproval}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmitApproval}
+            variant="contained"
+            color={approvalAction === 'approved' ? 'success' : 'error'}
+            disabled={submittingApproval || (approvalAction === 'disapproved' && (!feedback || feedback.trim() === ''))}
+          >
+            {submittingApproval ? <CircularProgress size={24} /> : (approvalAction === 'approved' ? 'Approve' : 'Disapprove')}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

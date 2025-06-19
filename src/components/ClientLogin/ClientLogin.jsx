@@ -38,7 +38,8 @@ const ClientLogin = () => {
         email: response.data.email,
         first_name: response.data.first_name,
         last_name: response.data.last_name,
-        company_name: response.data.company_name
+        company_name: response.data.company_name,
+        customer_ids: response.data.customer_ids
       }));
 
       // Redirect to client dashboard

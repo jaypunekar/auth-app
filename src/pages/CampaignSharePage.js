@@ -18,6 +18,8 @@ import {
   Card,
   CardContent,
   Snackbar,
+  Chip,
+  Link,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { API_BASE_URL } from '../config';
@@ -259,6 +261,52 @@ const CampaignSharePage = () => {
                           </ListItem>
                         ))}
                       </List>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+              
+              {campaignData.keywords && campaignData.keywords.length > 0 && (
+                <Grid item xs={12}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Keywords
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {campaignData.keywords.map((keyword, index) => (
+                          <Chip
+                            key={index}
+                            label={keyword}
+                            variant="outlined"
+                            color="primary"
+                            size="small"
+                          />
+                        ))}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              )}
+              
+              {campaignData.website_url && (
+                <Grid item xs={12}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Website
+                      </Typography>
+                      <Typography variant="body1">
+                        <Link
+                          href={campaignData.website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          color="primary"
+                          sx={{ wordBreak: 'break-all' }}
+                        >
+                          {campaignData.website_url}
+                        </Link>
+                      </Typography>
                     </CardContent>
                   </Card>
                 </Grid>

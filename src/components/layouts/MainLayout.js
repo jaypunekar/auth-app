@@ -48,7 +48,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  MonetizationOn as MonetizationOnIcon
+  MonetizationOn as MonetizationOnIcon,
+  Share as ShareIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -176,6 +177,7 @@ const MainLayout = () => {
     { text: 'Facebook Analyzer', icon: <FacebookIcon />, path: '/facebook-analyzer' },
     { text: 'Google Ads Analytics', icon: <AnalyticsIcon />, path: '/google-ads-analytics' },
     { text: 'Campaign Spending', icon: <MonetizationOnIcon />, path: '/campaign-spending' },
+    { text: 'Shared Campaigns', icon: <ShareIcon />, path: '/shared-campaigns' },
     { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
   ];
 
