@@ -129,7 +129,7 @@ const ClientDashboard = () => {
           const campaign = customerCampaigns[0];
           setSelectedCampaign(campaign);
           if (campaign.source !== 'shared') {
-            fetchCampaignAnalytics(firstCustomerId, customerCampaigns[0].id);
+          fetchCampaignAnalytics(firstCustomerId, customerCampaigns[0].id);
           }
         }
       }
@@ -185,12 +185,12 @@ const ClientDashboard = () => {
       // Overview tab - fetch combined analytics
       const anyGoogleCampaign = campaigns.find(c => c.customer_id === selectedCustomerId && c.source !== 'shared');
       if (anyGoogleCampaign) {
-        fetchCombinedAnalytics(selectedCustomerId);
+      fetchCombinedAnalytics(selectedCustomerId);
       }
     } else if (newValue === 1 && selectedCustomerId && selectedCampaignId) {
       // Campaign details tab - fetch specific campaign analytics
       if (selectedCampaign && selectedCampaign.source !== 'shared') {
-        fetchCampaignAnalytics(selectedCustomerId, selectedCampaignId);
+      fetchCampaignAnalytics(selectedCustomerId, selectedCampaignId);
       }
     }
   };
@@ -203,7 +203,7 @@ const ClientDashboard = () => {
     setSelectedCampaign(campaign);
     // Only fetch analytics for Google Ads campaigns
     if (campaign && campaign.source !== 'shared') {
-      fetchCampaignAnalytics(customerId, campaignId);
+    fetchCampaignAnalytics(customerId, campaignId);
     } else {
       setAnalyticsData(null);
     }
@@ -217,7 +217,7 @@ const ClientDashboard = () => {
     // Only fetch analytics for Google Ads customers
     const anyGoogleCampaign = campaigns.find(c => c.customer_id === customerId && c.source !== 'shared');
     if (anyGoogleCampaign) {
-      fetchCombinedAnalytics(customerId);
+    fetchCombinedAnalytics(customerId);
     } else {
       setAnalyticsData(null);
     }
@@ -328,7 +328,7 @@ const ClientDashboard = () => {
     if (!c.approvals) return false;
     return c.approvals.some(a => a.status === 'disapproved');
   });
-
+  
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       {/* Header with client info */}
@@ -388,46 +388,46 @@ const ClientDashboard = () => {
               </Tabs>
               {campaignTab === 0 ? (
                 Object.entries(customerCampaigns).length === 0 ? (
-                  <Alert severity="info">
-                    No campaigns available. Please contact your account manager.
-                  </Alert>
-                ) : (
-                  Object.entries(customerCampaigns).map(([customerId, campaigns]) => (
-                    <Box key={customerId} sx={{ mb: 3 }}>
-                      <Button
-                        fullWidth
-                        variant={selectedCustomerId === customerId && !selectedCampaignId ? "contained" : "outlined"}
-                        color="primary"
-                        onClick={() => handleCustomerSelect(customerId)}
-                        sx={{ mb: 1 }}
-                      >
-                        Account: {customerId.substring(0, 6)}... (All Campaigns)
-                      </Button>
-                      <List dense>
-                        {campaigns.map(campaign => (
-                          <ListItem
-                            key={campaign.id}
-                            button
-                            selected={selectedCampaignId === campaign.id}
-                            onClick={() => handleCampaignSelect(customerId, campaign.id)}
-                          >
-                            <ListItemText
+                <Alert severity="info">
+                  No campaigns available. Please contact your account manager.
+                </Alert>
+              ) : (
+                Object.entries(customerCampaigns).map(([customerId, campaigns]) => (
+                  <Box key={customerId} sx={{ mb: 3 }}>
+                    <Button
+                      fullWidth
+                      variant={selectedCustomerId === customerId && !selectedCampaignId ? "contained" : "outlined"}
+                      color="primary"
+                      onClick={() => handleCustomerSelect(customerId)}
+                      sx={{ mb: 1 }}
+                    >
+                      Account: {customerId.substring(0, 6)}... (All Campaigns)
+                    </Button>
+                    <List dense>
+                      {campaigns.map(campaign => (
+                        <ListItem
+                          key={campaign.id}
+                          button
+                          selected={selectedCampaignId === campaign.id}
+                          onClick={() => handleCampaignSelect(customerId, campaign.id)}
+                        >
+                          <ListItemText
                               primary={campaign.source === 'shared' ? campaign.title : (campaign.name || campaign.title)}
                               secondary={campaign.source === 'shared' ? `Shared Campaign` : `Status: ${campaign.status || 'Unknown'}`}
-                            />
-                            <ListItemSecondaryAction>
-                              <Tooltip title="View Details">
-                                <IconButton edge="end" onClick={() => handleCampaignSelect(customerId, campaign.id)}>
-                                  <ViewIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </ListItemSecondaryAction>
-                          </ListItem>
-                        ))}
-                      </List>
-                      <Divider sx={{ mt: 1 }} />
-                    </Box>
-                  ))
+                          />
+                          <ListItemSecondaryAction>
+                            <Tooltip title="View Details">
+                              <IconButton edge="end" onClick={() => handleCampaignSelect(customerId, campaign.id)}>
+                                <ViewIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      ))}
+                    </List>
+                    <Divider sx={{ mt: 1 }} />
+                  </Box>
+                ))
                 )
               ) : (
                 // Needs Your Review tab
@@ -481,80 +481,80 @@ const ClientDashboard = () => {
                 <>
                   {/* Summary Cards */}
                   {analyticsData && (
-                    <Grid container spacing={2} sx={{ mb: 4 }}>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              Impressions
-                            </Typography>
-                            <Typography variant="h5">
-                              {analyticsData.overall_metrics?.total_impressions?.toLocaleString() || 0}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              Clicks
-                            </Typography>
-                            <Typography variant="h5">
-                              {analyticsData.overall_metrics?.total_clicks?.toLocaleString() || 0}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              Cost
-                            </Typography>
-                            <Typography variant="h5">
-                              ${analyticsData.overall_metrics?.total_cost?.toFixed(2) || '0.00'}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              CTR
-                            </Typography>
-                            <Typography variant="h5">
-                              {analyticsData.overall_metrics?.average_ctr?.toFixed(2) || '0.00'}%
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              CPC
-                            </Typography>
-                            <Typography variant="h5">
-                              ${analyticsData.overall_metrics?.average_cpc?.toFixed(2) || '0.00'}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                      <Grid item xs={6} sm={4}>
-                        <Card>
-                          <CardContent>
-                            <Typography color="textSecondary" gutterBottom>
-                              Conversions
-                            </Typography>
-                            <Typography variant="h5">
-                              {analyticsData.overall_metrics?.total_conversions?.toLocaleString() || 0}
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
+                  <Grid container spacing={2} sx={{ mb: 4 }}>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            Impressions
+                          </Typography>
+                          <Typography variant="h5">
+                            {analyticsData.overall_metrics?.total_impressions?.toLocaleString() || 0}
+                          </Typography>
+                        </CardContent>
+                      </Card>
                     </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            Clicks
+                          </Typography>
+                          <Typography variant="h5">
+                            {analyticsData.overall_metrics?.total_clicks?.toLocaleString() || 0}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            Cost
+                          </Typography>
+                          <Typography variant="h5">
+                            ${analyticsData.overall_metrics?.total_cost?.toFixed(2) || '0.00'}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            CTR
+                          </Typography>
+                          <Typography variant="h5">
+                            {analyticsData.overall_metrics?.average_ctr?.toFixed(2) || '0.00'}%
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            CPC
+                          </Typography>
+                          <Typography variant="h5">
+                            ${analyticsData.overall_metrics?.average_cpc?.toFixed(2) || '0.00'}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                    <Grid item xs={6} sm={4}>
+                      <Card>
+                        <CardContent>
+                          <Typography color="textSecondary" gutterBottom>
+                            Conversions
+                          </Typography>
+                          <Typography variant="h5">
+                            {analyticsData.overall_metrics?.total_conversions?.toLocaleString() || 0}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
                   )}
                   
                   {/* Performance Chart */}
@@ -614,14 +614,14 @@ const ClientDashboard = () => {
                       <Typography variant="h6" gutterBottom>
                         Shared Campaign Details
                       </Typography>
-                      <Grid container spacing={2}>
+                        <Grid container spacing={2}>
                         <Grid item xs={12}>
-                          <Card>
-                            <CardContent>
+                              <Card>
+                                <CardContent>
                               <Typography variant="h5">{selectedCampaign.title}</Typography>
                               <Typography variant="body1" color="text.secondary" paragraph>
                                 {selectedCampaign.description}
-                              </Typography>
+                                  </Typography>
                               <Divider sx={{ my: 2 }} />
                               <Typography variant="subtitle1">Platform: {selectedCampaign.platform}</Typography>
                               <Typography variant="subtitle1">Budget: ${selectedCampaign.budget}</Typography>
@@ -679,8 +679,8 @@ const ClientDashboard = () => {
                                   </Box>
                                 </Box>
                               )}
-                            </CardContent>
-                          </Card>
+                                </CardContent>
+                              </Card>
                         </Grid>
                       </Grid>
                     </Box>

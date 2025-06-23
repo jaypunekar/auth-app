@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { Box, Typography, Chip, Tooltip, Button, CircularProgress } from '@mui/material';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import VerifiedIcon from '@mui/icons-material/Verified';
@@ -73,7 +73,7 @@ const CreditDisplay = ({
     };
   }, []);
 
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     try {
       setLoading(true);
       // Fix the URL - REACT_APP_API_URL likely already includes '/api'
@@ -100,13 +100,13 @@ const CreditDisplay = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (token) {
       fetchCredits();
     }
-  }, [token, refreshTrigger]); // Add refreshTrigger as a dependency to re-fetch when it changes
+  }, [token, refreshTrigger, fetchCredits]); // Add fetchCredits as a dependency
 
   // Function to determine color based on credit amount
   const getColorByCredits = (credits) => {

@@ -1727,7 +1727,7 @@ const Dashboard = () => {
           <Button onClick={handleUpdateAdDialogClose}>Cancel</Button>
           <Button 
             onClick={handleSubmitAdUpdate} 
-            variant="contained" 
+            variant="contained"
             color="primary"
           >
             Update
@@ -1738,4 +1738,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard;
+export default Dashboard; 

@@ -259,7 +259,7 @@ const ComprehensiveAnalysis = () => {
             disabled={loading || !url}
             startIcon={loading ? <CircularProgress size={20} /> : <Search />}
           >
-            {loading ? 'Analyzing...' : 'Run Comprehensive Analysis'}
+            {loading ? 'Analyzing...' : 'Run Comprehensive Analysis (33 Credits)'}
           </Button>
         </Box>
       </Paper>

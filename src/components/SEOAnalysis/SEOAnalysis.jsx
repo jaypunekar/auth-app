@@ -29,6 +29,7 @@ import {
   Language,
   Warning,
   CompareArrows,
+  CreditCard,
 } from '@mui/icons-material';
 import axios from 'axios';
 import SEOResults from './SEOResults';
@@ -84,15 +85,15 @@ const SEOAnalysis = () => {
   };
 
   const tools = [
-    { label: 'Content Analysis', icon: <Description />, endpoint: 'content-analysis' },
-    { label: 'Readability', icon: <Visibility />, endpoint: 'readability' },
-    { label: 'Keyword Density', icon: <ContentCopy />, endpoint: 'keyword-density' },
-    { label: 'Technical Audit', icon: <Speed />, endpoint: 'technical-audit' },
-    { label: 'SERP Analysis', icon: <Search />, endpoint: 'serp-analysis' },
-    { label: 'Traffic Analysis', icon: <TrendingUp />, endpoint: 'traffic' },
-    { label: 'Backlink Overview', icon: <LinkIcon />, endpoint: 'backlinks' },
-    { label: 'Analytics', icon: <Analytics />, endpoint: 'word-count' },
-    { label: 'Competitor Analysis', icon: <CompareArrows />, endpoint: 'competitor-analysis' },
+    { label: 'Content Analysis', icon: <Description />, endpoint: 'content-analysis', credits: 6 },
+    { label: 'Readability', icon: <Visibility />, endpoint: 'readability', credits: 1 },
+    { label: 'Keyword Density', icon: <ContentCopy />, endpoint: 'keyword-density', credits: 12 },
+    { label: 'Technical Audit', icon: <Speed />, endpoint: 'technical-audit', credits: 4 },
+    { label: 'SERP Analysis', icon: <Search />, endpoint: 'serp-analysis', credits: 12 },
+    { label: 'Traffic Analysis', icon: <TrendingUp />, endpoint: 'traffic', credits: 4 },
+    { label: 'Backlink Overview', icon: <LinkIcon />, endpoint: 'backlinks', credits: 8 },
+    { label: 'Analytics', icon: <Analytics />, endpoint: 'word-count', credits: 0 },
+    { label: 'Competitor Analysis', icon: <CompareArrows />, endpoint: 'competitor-analysis', credits: 4 },
   ];
 
   return (
@@ -101,6 +102,26 @@ const SEOAnalysis = () => {
         <Language sx={{ mr: 1, verticalAlign: 'middle' }} />
         Website SEO Analysis
       </Typography>
+
+      {/* Credit Cost Summary */}
+      <Paper elevation={2} sx={{ p: 2, mb: 3, bgcolor: 'background.default' }}>
+        <Typography variant="h6" gutterBottom color="primary">
+          Credit Costs
+        </Typography>
+        <Grid container spacing={1}>
+          {tools.filter(tool => tool.credits > 0).map((tool) => (
+            <Grid item xs={6} sm={4} md={3} key={tool.endpoint}>
+              <Chip
+                icon={tool.icon}
+                label={`${tool.label}: ${tool.credits} credits`}
+                size="small"
+                variant="outlined"
+                sx={{ mb: 1 }}
+              />
+            </Grid>
+          ))}
+        </Grid>
+      </Paper>
 
       <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
         <Grid container spacing={3}>
@@ -171,6 +192,17 @@ const SEOAnalysis = () => {
               >
                 {loading ? 'Analyzing...' : `Run ${tools[activeTab].label}`}
               </Button>
+            </Grid>
+            <Grid item xs={12} sm="auto">
+              {tools[activeTab].credits > 0 && (
+                <Chip
+                  icon={<CreditCard />}
+                  label={`${tools[activeTab].credits} Credits`}
+                  color="secondary"
+                  variant="outlined"
+                  size="small"
+                />
+              )}
             </Grid>
             <Grid item xs={12} sm="auto">
               <Chip
