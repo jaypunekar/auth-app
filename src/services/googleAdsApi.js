@@ -510,6 +510,23 @@ const googleAdsApi = {
       }
       throw error;
     }
+  },
+
+  // Get active campaigns calendar data
+  getCampaignCalendar: async () => {
+    try {
+      console.log('Getting active campaigns calendar data...');
+      const response = await api.get('/google-ads/campaign-calendar');
+      console.log('Campaign calendar response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error getting campaign calendar:', error);
+      if (error.response) {
+        console.error('Error status:', error.response.status);
+        console.error('Error data:', error.response.data);
+      }
+      throw error;
+    }
   }
 };
 

@@ -711,7 +711,7 @@ const Dashboard = () => {
           setSnackbarOpen(true);
         }
       } else {
-        // For AdTask campaigns (soft delete)
+        // For adTask campaigns (soft delete)
         const response = await adCampaignAPI.deleteCampaign(campaignToDelete.id);
         
         if (response.data) {

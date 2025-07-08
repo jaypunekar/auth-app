@@ -49,7 +49,8 @@ import {
   Refresh as RefreshIcon,
   Search as SearchIcon,
   MonetizationOn as MonetizationOnIcon,
-  Share as ShareIcon
+  Share as ShareIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import { useAuth } from '../../context/AuthContext';
 import GoogleAdsLinkButton from '../GoogleAdsLinkButton';
@@ -179,6 +180,7 @@ const MainLayout = () => {
     { text: 'Campaign Spending', icon: <MonetizationOnIcon />, path: '/campaign-spending' },
     { text: 'Shared Campaigns', icon: <ShareIcon />, path: '/shared-campaigns' },
     { text: 'Subscriptions', icon: <SubscriptionsIcon />, path: '/subscriptions' },
+    { text: 'Payment History', icon: <ReceiptIcon />, path: '/payment-history' },
   ];
 
   const drawer = (

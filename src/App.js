@@ -41,6 +41,7 @@ import CampaignSharePage from './pages/CampaignSharePage';
 import CampaignSpendingPage from './pages/CampaignSpendingPage';
 import ClientManagementPage from './pages/ClientManagementPage';
 import SharedCampaignsPage from './pages/SharedCampaignsPage';
+import PaymentHistoryPage from './pages/PaymentHistoryPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -130,6 +131,7 @@ function App() {
           <Route path="campaign-share" element={<CampaignSharePage />} />
           <Route path="client-management" element={<ClientManagementPage />} />
           <Route path="shared-campaigns" element={<SharedCampaignsPage />} />
+          <Route path="payment-history" element={<PaymentHistoryPage />} />
         </Route>
 
         {/* Redirect to login for any other route */}
