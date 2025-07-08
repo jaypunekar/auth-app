@@ -242,6 +242,10 @@ export const authAPI = {
   },
   googleLogin: (token, userId = null) => api.post('/auth/google', { token, userId }),
   getUser: () => api.get('/auth/me'),
+  updateTutorialStatus: (isCompleted) => {
+    console.log(`Updating tutorial status to: ${isCompleted}`);
+    return api.patch('/auth/me/tutorial', { has_completed_tutorial: isCompleted });
+  },
 };
 
 // Chat API

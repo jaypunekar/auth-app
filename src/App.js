@@ -11,6 +11,7 @@ import ComprehensiveAnalysis from './components/SEOAnalysis/ComprehensiveAnalysi
 import ContactPage from './pages/ContactPage';
 import ClientLogin from './components/ClientLogin/ClientLogin';
 import ClientDashboard from './components/ClientDashboard/ClientDashboard';
+import TutorialPage from './pages/TutorialPage';
 
 // Layouts
 import MainLayout from './components/layouts/MainLayout';
@@ -132,6 +133,7 @@ function App() {
           <Route path="client-management" element={<ClientManagementPage />} />
           <Route path="shared-campaigns" element={<SharedCampaignsPage />} />
           <Route path="payment-history" element={<PaymentHistoryPage />} />
+          <Route path="tutorial" element={<TutorialPage />} />
         </Route>
 
         {/* Redirect to login for any other route */}
